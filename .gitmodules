@@ -1,0 +1,3 @@
+[submodule "wreath"]
+	path = wreath
+	url = https://github.com/hirnlego/wreath

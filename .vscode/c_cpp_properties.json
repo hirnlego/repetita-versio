@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "macFrameworkPath": [],
+            "compilerPath": "/usr/local/bin/arm-none-eabi-gcc",
+            "intelliSenseMode": "macos-gcc-arm"
+        }
+    ],
+    "version": 4
+}
