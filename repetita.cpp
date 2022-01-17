@@ -7,8 +7,8 @@ using namespace wreath;
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
 {
     UpdateClock();
-    UpdateControls();
-    GenerateUiEvents();
+    ProcessControls();
+    GenerateUiEvents1();
 
     for (size_t i = 0; i < size; i++)
     {

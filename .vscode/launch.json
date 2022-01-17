@@ -10,7 +10,7 @@
                 "-d",
                 "${workspaceRoot}"
             ],
-            "executable": "${workspaceRoot}/build/repetita.elf",
+            "executable": "${workspaceRoot}/build/RepetitaVersio.elf",
             "interface": "swd",
             "name": "Cortex Debug",
             "openOCDLaunchCommands": [

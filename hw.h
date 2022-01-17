@@ -15,24 +15,12 @@ namespace wreath
 
     DaisyVersio hw;
 
-    Parameter knob1;
-    Parameter knob2;
-    Parameter knob1_dac;
-    Parameter knob2_dac;
-    Parameter cv1;
-    Parameter cv2;
-
-    float knob1Value{};
-    float knob2Value{};
-    float cv1Value{};
-    float cv2Value{};
-    bool knob1Changed{};
-    bool knob2Changed{};
-    bool cv1Trigger{};
-    bool raising{};
-    bool triggered{};
-    bool isCv1Connected{};
-    bool isCv2Connected{};
+    char switch1Pos{};
+    size_t switch1Begin{};
+    size_t switch1End{};
+    char switch2Pos{};
+    size_t switch2Begin{};
+    size_t switch2End{};
 
     static size_t begin{};
     static size_t end{};
@@ -54,7 +42,7 @@ namespace wreath
 
     inline void InitHw(float knobSlewSeconds, float cvSlewSeconds)
     {
-        hw.Init();
+        hw.Init(true);
         hw.StartAdc();
     }
 
@@ -70,45 +58,27 @@ namespace wreath
     inline void ProcessControls()
     {
         hw.ProcessAllControls();
-
-        hw.seed.dac.WriteValue(daisy::DacHandle::Channel::ONE, static_cast<uint16_t>(knob1_dac.Process()));
-        hw.seed.dac.WriteValue(daisy::DacHandle::Channel::TWO, static_cast<uint16_t>(knob2_dac.Process()));
-
-        knob1Changed = std::abs(knob1Value - knob1.Process()) > kMinValueDelta;
-        if (knob1Changed)
+        hw.tap.Debounce();
+/*
+        if (switch1Pos != hw.sw[0].Read())
         {
-            knob1Value = knob1.Process();
-        }
-        knob2Changed = std::abs(knob2Value - knob2.Process()) > kMinValueDelta;
-        if (knob2Changed)
-        {
-            knob2Value = knob2.Process();
-        }
-
-        isCv1Connected = std::abs(cv1Value - cv1.Process()) > kMinValueDelta;
-        if (isCv1Connected)
-        {
-            cv1Trigger = false;
-            raising = cv1.Process() < cv1Value;
-            if (!triggered && raising && cv1.Process() >= kTriggerThres)
+            switch1End = ms;
+            if (switch1End - switch1Begin > 500.f)
             {
-                int bpm = CalculateBpm();
-                if (bpm < kMaxBpm)
-                {
-                    cv1Bpm = bpm;
-                }
-                triggered = true;
-                cv1Trigger = true;
-                begin = ms;
+                switch1Pos = hw.sw[0].Read();
             }
-            else if (!raising || cv1.Process() < kTriggerThres)
-            {
-                triggered = false;
-            }
+            switch1Begin = ms;
         }
-        cv1Value = cv1.Process();
 
-        isCv2Connected = std::abs(cv2Value - cv2.Process()) > kMinValueDelta;
-        cv2Value = cv2.Process();
+        if (switch2Pos != hw.sw[1].Read())
+        {
+            switch2End = ms;
+            if (switch2End - switch2Begin > 500.f)
+            {
+                switch2Pos = hw.sw[1].Read();
+            }
+            switch2Begin = ms;
+        }
+*/
     }
 }

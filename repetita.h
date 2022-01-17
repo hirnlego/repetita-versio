@@ -5,7 +5,7 @@
 namespace wreath
 {
     constexpr float kMinSpeedMult{0.02f};
-    constexpr float kMaxSpeedMult{50.f};
+    constexpr float kMaxSpeedMult{4.f};
 
     StereoLooper looper;
 }
