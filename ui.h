@@ -16,7 +16,6 @@ namespace wreath
     UiEventQueue eventQueue;
 
     float knobValues[7]{};
-    bool knobChanged[7]{};
     enum class MenuClickOp
     {
         TRIGGER,
@@ -24,6 +23,34 @@ namespace wreath
         RESET,
     };
     MenuClickOp clickOp{MenuClickOp::TRIGGER};
+
+    StereoLooper::TriggerMode currentTriggerMode{};
+
+    // 0: center, 1: left, 2: right
+    static void HandleFlowSwitch()
+    {
+        if (hw.sw[DaisyVersio::SW_1].Read() == currentTriggerMode)
+        {
+            return;
+        }
+
+        switch (hw.sw[DaisyVersio::SW_1].Read())
+        {
+        case 0:
+            currentTriggerMode = StereoLooper::TriggerMode::TRIGGER;
+            break;
+        case 1:
+            currentTriggerMode = StereoLooper::TriggerMode::GATE;
+            break;
+        case 2:
+            currentTriggerMode = StereoLooper::TriggerMode::LOOP;
+            break;
+        default:
+            break;
+        }
+
+        looper.SetTriggerMode(currentTriggerMode);
+    }
 
     // 0: center, 1: left, 2: right
     static void SwitchToChannel(char pos)
@@ -68,11 +95,8 @@ namespace wreath
             break;
 
         case UiEventQueue::Event::EventType::buttonReleased:
-            if (looper.IsBuffering())
-            {
-                // Stop buffering.
-                looper.mustStopBuffering = true;
-            }
+
+            /*
             else if (clickOp == MenuClickOp::TRIGGER)
             {
                 looper.Restart();
@@ -94,6 +118,7 @@ namespace wreath
                 looper.mustResetLooper = true;
                 clickOp = MenuClickOp::TRIGGER;
             }
+            */
             break;
 
         default:
@@ -125,8 +150,7 @@ namespace wreath
     inline void ProcessPot(int idx)
     {
         float val = hw.GetKnobValue(idx);
-        knobChanged[idx] = std::abs(knobValues[idx] - val) > kMinValueDelta;
-        if (knobChanged[idx])
+        if (std::abs(knobValues[idx] - val) > kMinValueDelta)
         {
             switch (idx)
             {
@@ -146,7 +170,7 @@ namespace wreath
                 case DaisyVersio::KNOB_3:
                     //samples *= (currentLoopLength >= kMinSamplesForTone) ? std::floor(currentLoopLength * 0.1f) : kMinLoopLengthSamples;
                     //currentLoopLength += samples;
-                    //looper.SetLoopLength(currentLooper, fmap(val, 0, looper.GetBufferSamples(StereoLooper::LEFT)));
+                    looper.SetLoopLength(currentLooper, fmap(val, kMinLoopLengthSamples, looper.GetBufferSamples(StereoLooper::LEFT)));
                     break;
                 // Decay
                 case DaisyVersio::KNOB_4:
@@ -156,11 +180,11 @@ namespace wreath
                 case DaisyVersio::KNOB_5:
                     if (val < 0.5f)
                     {
-                        //looper.SetReadRate(currentLooper, fmap(val * 2, kMinSpeedMult, 1.f));
+                        looper.SetReadRate(currentLooper, fmap(val * 2, kMinSpeedMult, 1.f));
                     }
                     else
                     {
-                        //looper.SetReadRate(currentLooper, fmap((val * 2) - 1, 1.f, kMaxSpeedMult));
+                        looper.SetReadRate(currentLooper, fmap((val * 2) - 1, 1.f, kMaxSpeedMult));
                     }
                     break;
                 // Thaw
@@ -172,7 +196,7 @@ namespace wreath
                     break;
             }
 
-            knobChanged[idx] = val;
+            knobValues[idx] = val;
         }
     }
 
@@ -182,37 +206,68 @@ namespace wreath
         {
             if (hw.tap.RisingEdge())
             {
-                eventQueue.AddButtonPressed(0, 1);
                 TrigLed(0, true);
+                if (looper.IsBuffering())
+                {
+                    // Stop buffering.
+                    looper.mustStopBuffering = true;
+                }
+                else
+                {
+                    switch (looper.GetTriggerMode())
+                    {
+                        case StereoLooper::TriggerMode::GATE:
+                            looper.mustStart = true;
+                            break;
+                        case StereoLooper::TriggerMode::TRIGGER:
+                            looper.mustRestart = true;
+                            break;
+                    }
+                }
             }
             if (hw.tap.FallingEdge())
             {
-                eventQueue.AddButtonReleased(0);
                 TrigLed(0, false);
+                if (!looper.IsBuffering())
+                {
+                    if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
+                    {
+                        looper.mustStop = true;
+                    }
+                }
             }
 
-            if (hw.tap.TimeHeldMs() >= 1000.f)
+            if (!looper.IsBuffering())
             {
-                clickOp = MenuClickOp::CLEAR;
-            }
-            if (hw.tap.TimeHeldMs() >= 5000.f)
-            {
-                clickOp = MenuClickOp::RESET;
-            }
+                if (hw.tap.TimeHeldMs() >= 1000.f)
+                {
+                    clickOp = MenuClickOp::CLEAR;
+                }
+                if (hw.tap.TimeHeldMs() >= 5000.f)
+                {
+                    clickOp = MenuClickOp::RESET;
+                }
 
-            if (hw.gate.Trig())
-            {
-                looper.Restart();
-                //TrigLed(0, true);
-            }
+                if (hw.Gate())
+                {
+                    looper.mustRestart = true;
+                    TrigLed(3, true);
+                }
+                else
+                {
+                    TrigLed(3, false);
+                }
 
-            ProcessPot(DaisyVersio::KNOB_0);
-            ProcessPot(DaisyVersio::KNOB_1);
-            ProcessPot(DaisyVersio::KNOB_2);
-            ProcessPot(DaisyVersio::KNOB_3);
-            ProcessPot(DaisyVersio::KNOB_4);
-            ProcessPot(DaisyVersio::KNOB_5);
-            ProcessPot(DaisyVersio::KNOB_6);
+                HandleFlowSwitch();
+
+                ProcessPot(DaisyVersio::KNOB_5); // Rate
+                ProcessPot(DaisyVersio::KNOB_3); // Flip
+                ProcessPot(DaisyVersio::KNOB_1); // Start
+                ProcessPot(DaisyVersio::KNOB_2); // Tone
+                ProcessPot(DaisyVersio::KNOB_4); // Decay
+                ProcessPot(DaisyVersio::KNOB_6); // Thaw
+                ProcessPot(DaisyVersio::KNOB_0); // Blend
+            }
         }
     }
 
