@@ -12,40 +12,18 @@ namespace wreath
     using namespace daisysp;
 
     char currentLooper{StereoLooper::BOTH};
+
     UiEventQueue eventQueue;
 
     float knobValues[7]{};
     bool knobChanged[7]{};
     enum class MenuClickOp
     {
-        FREEZE,
+        TRIGGER,
         CLEAR,
         RESET,
     };
-    MenuClickOp clickOp{MenuClickOp::FREEZE};
-
-    // 0: center, 1: left, 2: right
-    static void SwitchToMovement(char pos)
-    {
-        Movement movement{};
-        switch (pos)
-        {
-        case 0:
-            movement = Movement::DRUNK;
-            break;
-        case 1:
-            movement = Movement::NORMAL;
-            looper.SetDirection(currentLooper, Direction::BACKWARDS);
-            break;
-        case 2:
-            movement = Movement::NORMAL;
-            looper.SetDirection(currentLooper, Direction::FORWARD);
-            break;
-        default:
-            break;
-        }
-        looper.SetMovement(currentLooper, movement);
-    }
+    MenuClickOp clickOp{MenuClickOp::TRIGGER};
 
     // 0: center, 1: left, 2: right
     static void SwitchToChannel(char pos)
@@ -69,6 +47,19 @@ namespace wreath
         }
     }
 
+    inline void TrigLed(int idx, bool active)
+    {
+        if (active)
+        {
+            hw.leds[idx].Set(1, 1, 1);
+        }
+        else
+        {
+            hw.leds[idx].Set(0, 0, 0);
+        }
+        hw.UpdateLeds();
+    }
+
     inline static void ProcessEvent(const UiEventQueue::Event &e)
     {
         switch (e.type)
@@ -82,10 +73,9 @@ namespace wreath
                 // Stop buffering.
                 looper.mustStopBuffering = true;
             }
-            else if (clickOp == MenuClickOp::FREEZE)
+            else if (clickOp == MenuClickOp::TRIGGER)
             {
-                // Toggle freeze.
-                looper.ToggleFreeze();
+                looper.Restart();
             }
             else if (clickOp == MenuClickOp::CLEAR)
             {
@@ -96,13 +86,13 @@ namespace wreath
                 }
                 // Clear the buffer.
                 looper.mustClearBuffer = true;
-                clickOp = MenuClickOp::FREEZE;
+                clickOp = MenuClickOp::TRIGGER;
             }
             else if (clickOp == MenuClickOp::RESET)
             {
                 // Reset the looper.
                 looper.mustResetLooper = true;
-                clickOp = MenuClickOp::FREEZE;
+                clickOp = MenuClickOp::TRIGGER;
             }
             break;
 
@@ -166,16 +156,16 @@ namespace wreath
                 case DaisyVersio::KNOB_5:
                     if (val < 0.5f)
                     {
-                        looper.SetReadRate(currentLooper, fmap(val * 2, kMinSpeedMult, 1.f));
+                        //looper.SetReadRate(currentLooper, fmap(val * 2, kMinSpeedMult, 1.f));
                     }
                     else
                     {
-                        looper.SetReadRate(currentLooper, fmap((val * 2) - 1, 1.f, kMaxSpeedMult));
+                        //looper.SetReadRate(currentLooper, fmap((val * 2) - 1, 1.f, kMaxSpeedMult));
                     }
                     break;
                 // Thaw
                 case DaisyVersio::KNOB_6:
-                    // TODO
+                    looper.SetFreeze(val);
                     break;
 
                 default:
@@ -186,17 +176,19 @@ namespace wreath
         }
     }
 
-    inline void GenerateUiEvents1()
+    inline void GenerateUiEvents()
     {
         if (!looper.IsStartingUp())
         {
             if (hw.tap.RisingEdge())
             {
                 eventQueue.AddButtonPressed(0, 1);
+                TrigLed(0, true);
             }
             if (hw.tap.FallingEdge())
             {
                 eventQueue.AddButtonReleased(0);
+                TrigLed(0, false);
             }
 
             if (hw.tap.TimeHeldMs() >= 1000.f)
@@ -206,6 +198,12 @@ namespace wreath
             if (hw.tap.TimeHeldMs() >= 5000.f)
             {
                 clickOp = MenuClickOp::RESET;
+            }
+
+            if (hw.gate.Trig())
+            {
+                looper.Restart();
+                //TrigLed(0, true);
             }
 
             ProcessPot(DaisyVersio::KNOB_0);

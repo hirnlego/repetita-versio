@@ -8,7 +8,7 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 {
     UpdateClock();
     ProcessControls();
-    GenerateUiEvents1();
+    GenerateUiEvents();
 
     for (size_t i = 0; i < size; i++)
     {
