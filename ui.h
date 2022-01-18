@@ -132,7 +132,6 @@ namespace wreath
         hw.UpdateLeds();
     }
 
-
     inline void ProcessPot(int idx)
     {
         float val = hw.GetKnobValue(idx);
@@ -141,23 +140,29 @@ namespace wreath
         {
             switch (idx)
             {
+                // Blend
                 case DaisyVersio::KNOB_0:
                     looper.nextMix = val;
                     break;
+                // Start
                 case DaisyVersio::KNOB_1:
                     looper.SetLoopStart(currentLooper, fmap(val, 0, looper.GetBufferSamples(StereoLooper::LEFT)));
                     break;
+                // Tone
                 case DaisyVersio::KNOB_2:
                     looper.nextFilterValue = fmap(val, 0, 1000.f);
                     break;
+                // Flip
                 case DaisyVersio::KNOB_3:
                     //samples *= (currentLoopLength >= kMinSamplesForTone) ? std::floor(currentLoopLength * 0.1f) : kMinLoopLengthSamples;
                     //currentLoopLength += samples;
                     //looper.SetLoopLength(currentLooper, fmap(val, 0, looper.GetBufferSamples(StereoLooper::LEFT)));
                     break;
+                // Decay
                 case DaisyVersio::KNOB_4:
                     looper.nextFeedback = val;
                     break;
+                // Speed
                 case DaisyVersio::KNOB_5:
                     if (val < 0.5f)
                     {
@@ -168,6 +173,7 @@ namespace wreath
                         looper.SetReadRate(currentLooper, fmap((val * 2) - 1, 1.f, kMaxSpeedMult));
                     }
                     break;
+                // Thaw
                 case DaisyVersio::KNOB_6:
                     // TODO
                     break;
