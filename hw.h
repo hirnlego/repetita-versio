@@ -7,7 +7,7 @@ namespace wreath
     using namespace daisy;
 
     // The minimum difference in parameter value to be registered.
-    constexpr float kMinValueDelta{0.01f};
+    constexpr float kMinValueDelta{0.002f};
     // The trigger threshold value.
     constexpr float kTriggerThres{0.3f};
     // Maximum BPM supported.
@@ -40,10 +40,18 @@ namespace wreath
         return std::round((1000.f / (end - begin)) * 60);
     }
 
-    inline void InitHw(float knobSlewSeconds, float cvSlewSeconds)
+    Parameter knobs[DaisyVersio::KNOB_LAST]{};
+
+    inline void InitHw()
     {
         hw.Init(true);
         hw.StartAdc();
+
+        for (short i = 0; i < DaisyVersio::KNOB_LAST; i++)
+        {
+            hw.knobs[i].SetCoeff(1.f); // No slew;
+            knobs[i].Init(hw.knobs[i], 0.0f, 1.0f, Parameter::LINEAR);
+        }
     }
 
     inline void UpdateClock()
@@ -59,6 +67,8 @@ namespace wreath
     {
         hw.ProcessAllControls();
         hw.tap.Debounce();
+        hw.UpdateLeds();
+
 /*
         if (switch1Pos != hw.sw[0].Read())
         {

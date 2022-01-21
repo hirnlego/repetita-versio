@@ -8,7 +8,7 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 {
     UpdateClock();
     ProcessControls();
-    GenerateUiEvents();
+    ProcessUi();
 
     for (size_t i = 0; i < size; i++)
     {
@@ -26,9 +26,19 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 
 int main(void)
 {
-    InitHw(0.05f, 0.f);
+    InitHw();
+    InitUi();
 
-    looper.Init(hw.AudioSampleRate());
+    StereoLooper::Conf conf
+    {
+        StereoLooper::Mode::MONO,
+        StereoLooper::TriggerMode::LOOP,
+        Movement::NORMAL,
+        Direction::FORWARD,
+        1.0f
+    };
+
+    looper.Init(hw.AudioSampleRate(), conf);
 
     hw.StartAudio(AudioCallback);
 

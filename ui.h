@@ -11,11 +11,8 @@ namespace wreath
     using namespace daisy;
     using namespace daisysp;
 
-    char currentLooper{StereoLooper::BOTH};
-
-    UiEventQueue eventQueue;
-
     float knobValues[7]{};
+    Color colors[7];
     enum class MenuClickOp
     {
         TRIGGER,
@@ -25,37 +22,24 @@ namespace wreath
     MenuClickOp clickOp{MenuClickOp::TRIGGER};
 
     StereoLooper::TriggerMode currentTriggerMode{};
+    char currentLooper{StereoLooper::BOTH};
+    bool noteMode{};
+    bool gateTriggered{};
+
+    UiEventQueue eventQueue;
 
     // 0: center, 1: left, 2: right
-    static void HandleFlowSwitch()
+    static void HandleLooperSwitch()
     {
-        if (hw.sw[DaisyVersio::SW_1].Read() == currentTriggerMode)
+        static char currentValue{};
+        char value = hw.sw[DaisyVersio::SW_0].Read();
+        if (value == currentValue)
         {
             return;
         }
+        currentValue = value;
 
-        switch (hw.sw[DaisyVersio::SW_1].Read())
-        {
-        case 0:
-            currentTriggerMode = StereoLooper::TriggerMode::TRIGGER;
-            break;
-        case 1:
-            currentTriggerMode = StereoLooper::TriggerMode::GATE;
-            break;
-        case 2:
-            currentTriggerMode = StereoLooper::TriggerMode::LOOP;
-            break;
-        default:
-            break;
-        }
-
-        looper.SetTriggerMode(currentTriggerMode);
-    }
-
-    // 0: center, 1: left, 2: right
-    static void SwitchToChannel(char pos)
-    {
-        switch (pos)
+        switch (value)
         {
         case 0:
             currentLooper = StereoLooper::BOTH;
@@ -74,55 +58,53 @@ namespace wreath
         }
     }
 
-    inline void TrigLed(int idx, bool active)
+    // 0: center, 1: left, 2: right
+    static void HandleTriggerSwitch()
     {
-        if (active)
+        char value = hw.sw[DaisyVersio::SW_1].Read();
+        if (value == currentTriggerMode)
         {
-            hw.leds[idx].Set(1, 1, 1);
+            return;
         }
-        else
+
+        switch (value)
         {
-            hw.leds[idx].Set(0, 0, 0);
-        }
-        hw.UpdateLeds();
-    }
-
-    inline static void ProcessEvent(const UiEventQueue::Event &e)
-    {
-        switch (e.type)
-        {
-        case UiEventQueue::Event::EventType::buttonPressed:
+        case 0:
+            currentTriggerMode = StereoLooper::TriggerMode::TRIGGER;
             break;
-
-        case UiEventQueue::Event::EventType::buttonReleased:
-
-            /*
-            else if (clickOp == MenuClickOp::TRIGGER)
-            {
-                looper.Restart();
-            }
-            else if (clickOp == MenuClickOp::CLEAR)
-            {
-                // Unfreeze if frozen.
-                if (looper.IsFrozen())
-                {
-                    looper.ToggleFreeze();
-                }
-                // Clear the buffer.
-                looper.mustClearBuffer = true;
-                clickOp = MenuClickOp::TRIGGER;
-            }
-            else if (clickOp == MenuClickOp::RESET)
-            {
-                // Reset the looper.
-                looper.mustResetLooper = true;
-                clickOp = MenuClickOp::TRIGGER;
-            }
-            */
+        case 1:
+            currentTriggerMode = StereoLooper::TriggerMode::GATE;
             break;
-
+        case 2:
+            currentTriggerMode = StereoLooper::TriggerMode::LOOP;
+            break;
         default:
             break;
+        }
+
+        looper.SetTriggerMode(currentTriggerMode);
+    }
+
+    inline void ClearLeds()
+    {
+        for (size_t i = 0; i < DaisyVersio::LED_LAST; i++)
+        {
+            hw.SetLed(i, 0, 0, 0);
+        }
+    }
+
+    inline void LedMeter(float value, short colorIdx)
+    {
+        ClearLeds();
+        short idx = static_cast<short>(std::floor(value * 4));
+        for (short i = 0; i <= idx; i++)
+        {
+            float factor = ((i == idx) ? (value * 4 - idx) : 1.f);
+            if (factor < kMinValueDelta)
+            {
+                factor = 0.f;
+            }
+            hw.SetLed(i, colors[colorIdx].Red() * factor, colors[colorIdx].Green() * factor, colors[colorIdx].Blue() * factor);
         }
     }
 
@@ -130,83 +112,132 @@ namespace wreath
     {
         if (looper.IsBuffering())
         {
-            hw.leds[hw.LED_0].SetRed(1);
+            LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 0);
         }
-        else
-        {
-            hw.leds[hw.LED_0].SetRed(0);
-        }
-        if (looper.IsFrozen())
-        {
-            hw.leds[hw.LED_0].SetBlue(1);
-        }
-        else
-        {
-            hw.leds[hw.LED_0].SetBlue(0);
-        }
-        hw.UpdateLeds();
+    }
+
+    float Map(float value, float aMin, float aMax, float bMin, float bMax)
+    {
+        float k = std::abs(bMax - bMin) / std::abs(aMax - aMin) * (bMax > bMin ? 1 : -1);
+
+        return bMin + k * (value - aMin);
     }
 
     inline void ProcessPot(int idx)
     {
-        float val = hw.GetKnobValue(idx);
-        if (std::abs(knobValues[idx] - val) > kMinValueDelta)
+        float value = knobs[idx].Process();
+        bool isChanging = std::abs(knobValues[idx] - value) > kMinValueDelta;
+        if (isChanging)
         {
+            // Handle range limits.
+            if (value < kMinValueDelta)
+            {
+                value = 0.f;
+            }
+            else if (value > 1 - kMinValueDelta)
+            {
+                value = 1.f;
+            }
+            LedMeter(value, idx);
             switch (idx)
             {
                 // Blend
                 case DaisyVersio::KNOB_0:
-                    looper.nextMix = val;
+                    looper.nextMix = value;
                     break;
                 // Start
                 case DaisyVersio::KNOB_1:
-                    looper.SetLoopStart(currentLooper, fmap(val, 0, looper.GetBufferSamples(StereoLooper::LEFT)));
+                    {
+                        int32_t loopEnd = looper.IsDualMode() ? looper.GetLoopEnd(currentLooper) : looper.GetLoopEnd(StereoLooper::LEFT);
+                        looper.SetLoopStart(currentLooper, Map(value, 0.f, 1.f, 0.f, loopEnd));
+                    }
                     break;
                 // Tone
                 case DaisyVersio::KNOB_2:
-                    looper.nextFilterValue = fmap(val, 0, 1000.f);
+                    looper.nextFilterValue = Map(value, 0.f, 1.f, 0.f, 1000.f);
                     break;
                 // Flip
                 case DaisyVersio::KNOB_3:
-                    //samples *= (currentLoopLength >= kMinSamplesForTone) ? std::floor(currentLoopLength * 0.1f) : kMinLoopLengthSamples;
-                    //currentLoopLength += samples;
-                    looper.SetLoopLength(currentLooper, fmap(val, kMinLoopLengthSamples, looper.GetBufferSamples(StereoLooper::LEFT)));
+                    {
+                        looper.SetDirection(currentLooper, value < 0.5f ? Direction::BACKWARDS : Direction::FORWARD);
+                        int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(currentLooper) : looper.GetBufferSamples(StereoLooper::LEFT);
+                        if (value < 0.3f)
+                        {
+                            looper.SetLoopLength(currentLooper, Map(value, 0.f, 0.3f, bufferSamples, kMinSamplesForTone));
+                            noteMode = false;
+                        }
+                        else if (value < 0.45f)
+                        {
+                            looper.SetLoopLength(currentLooper, Map(value, 0.3f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
+                            noteMode = false;
+                        }
+                        else if (value > 0.55f && value < 0.7f)
+                        {
+                            looper.SetLoopLength(currentLooper, Map(value, 0.55f, 0.7f, kMinLoopLengthSamples, kMinSamplesForTone));
+                            noteMode = false;
+                        }
+                        else if (value > 0.7f)
+                        {
+                            looper.SetLoopLength(currentLooper, Map(value, 0.7f, 1.f, kMinSamplesForTone, bufferSamples));
+                            noteMode = false;
+                        }
+                        // Dead center zone.
+                        else
+                        {
+                            looper.SetLoopLength(currentLooper, kMinLoopLengthSamples);
+                            noteMode = true;
+                        }
+                    }
                     break;
                 // Decay
                 case DaisyVersio::KNOB_4:
-                    looper.nextFeedback = val;
+                    looper.nextFeedback = value;
                     break;
                 // Speed
                 case DaisyVersio::KNOB_5:
-                    if (val < 0.5f)
+                    if (noteMode)
                     {
-                        looper.SetReadRate(currentLooper, fmap(val * 2, kMinSpeedMult, 1.f));
+                        // In "note" mode, the rate knob sets the pitch, with 5
+                        // octaves span.
+                        float n = Map(value, 0.f, 1.f, -48, 12);
+                        float rate = std::pow(2.f, n / 12);
+                        looper.SetReadRate(currentLooper, rate);
                     }
                     else
                     {
-                        looper.SetReadRate(currentLooper, fmap((val * 2) - 1, 1.f, kMaxSpeedMult));
+                        if (value < 0.45f)
+                        {
+                            looper.SetReadRate(currentLooper, Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f));
+                        }
+                        else if (value > 0.55f)
+                        {
+                            looper.SetReadRate(currentLooper, Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult));
+                        }
+                        // Dead center zone.
+                        else
+                        {
+                            looper.SetReadRate(currentLooper, 1.f);
+                        }
                     }
                     break;
                 // Thaw
                 case DaisyVersio::KNOB_6:
-                    looper.SetFreeze(val);
+                    looper.SetFreeze(value);
                     break;
 
                 default:
                     break;
             }
-
-            knobValues[idx] = val;
+            knobValues[idx] = value;
         }
     }
 
-    inline void GenerateUiEvents()
+    inline void ProcessUi()
     {
         if (!looper.IsStartingUp())
         {
             if (hw.tap.RisingEdge())
             {
-                TrigLed(0, true);
                 if (looper.IsBuffering())
                 {
                     // Stop buffering.
@@ -214,25 +245,24 @@ namespace wreath
                 }
                 else
                 {
-                    switch (looper.GetTriggerMode())
+                    if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
                     {
-                        case StereoLooper::TriggerMode::GATE:
-                            looper.mustStart = true;
-                            break;
-                        case StereoLooper::TriggerMode::TRIGGER:
-                            looper.mustRestart = true;
-                            break;
+                        looper.dryLevel_ = 1.0f;
+                        looper.mustRestartRead = true;
+                    }
+                    else
+                    {
+                        looper.mustRestart = true;
                     }
                 }
             }
             if (hw.tap.FallingEdge())
             {
-                TrigLed(0, false);
                 if (!looper.IsBuffering())
                 {
                     if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
                     {
-                        looper.mustStop = true;
+                        looper.dryLevel_ = 0.f;
                     }
                 }
             }
@@ -248,17 +278,26 @@ namespace wreath
                     clickOp = MenuClickOp::RESET;
                 }
 
-                if (hw.Gate())
+                if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
+                {
+                    if (hw.Gate())
+                    {
+                        looper.dryLevel_ = 1.0f;
+                        looper.mustRestartRead = true;
+                        gateTriggered = true;
+                    }
+                    else if (gateTriggered) {
+                        looper.dryLevel_ = 0.f;
+                        gateTriggered = false;
+                    }
+                }
+                else if (hw.gate.Trig())
                 {
                     looper.mustRestart = true;
-                    TrigLed(3, true);
-                }
-                else
-                {
-                    TrigLed(3, false);
                 }
 
-                HandleFlowSwitch();
+                HandleLooperSwitch();
+                HandleTriggerSwitch();
 
                 ProcessPot(DaisyVersio::KNOB_5); // Rate
                 ProcessPot(DaisyVersio::KNOB_3); // Flip
@@ -271,17 +310,14 @@ namespace wreath
         }
     }
 
-    inline void ProcessUi()
+    inline void InitUi()
     {
-        while (!eventQueue.IsQueueEmpty())
-        {
-            UiEventQueue::Event e = eventQueue.GetAndRemoveNextEvent();
-            if (e.type != UiEventQueue::Event::EventType::invalid)
-            {
-                ProcessEvent(e);
-            }
-        }
-
-        UpdateLeds();
+        colors[DaisyVersio::KNOB_0].Init(1.f, 1.f, 0.f); // Yellow
+        colors[DaisyVersio::KNOB_1].Init(1.f, 0.f, 1.f); // Magenta
+        colors[DaisyVersio::KNOB_2].Init(0.f, 1.f, 1.f); // Cyan
+        colors[DaisyVersio::KNOB_3].Init(0.1f, 0.f, 0.5f);
+        colors[DaisyVersio::KNOB_4].Init(0.5f, 0.1f, 0.f);
+        colors[DaisyVersio::KNOB_5].Init(0.f, 0.5f, 0.1f);
+        colors[DaisyVersio::KNOB_6].Init(1.f, 1.f, 1.f); // White
     }
 }

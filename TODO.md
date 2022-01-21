@@ -1,0 +1,2 @@
+- Fix gate mode when changing the relation between read and write heads (loop length, ratio, freeze)
+-
