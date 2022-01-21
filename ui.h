@@ -95,24 +95,22 @@ namespace wreath
 
     inline void LedMeter(float value, short colorIdx)
     {
-        ClearLeds();
         short idx = static_cast<short>(std::floor(value * 4));
-        for (short i = 0; i <= idx; i++)
+        for (short i = 0; i <= DaisyVersio::LED_LAST; i++)
         {
-            float factor = ((i == idx) ? (value * 4 - idx) : 1.f);
-            if (factor < kMinValueDelta)
+            if (i <= idx)
             {
-                factor = 0.f;
+                float factor = ((i == idx) ? (value * 4 - idx) : 1.f);
+                if (factor < kMinValueDelta)
+                {
+                    factor = 0.f;
+                }
+                hw.SetLed(i, colors[colorIdx].Red() * factor, colors[colorIdx].Green() * factor, colors[colorIdx].Blue() * factor);
             }
-            hw.SetLed(i, colors[colorIdx].Red() * factor, colors[colorIdx].Green() * factor, colors[colorIdx].Blue() * factor);
-        }
-    }
-
-    inline void UpdateLeds()
-    {
-        if (looper.IsBuffering())
-        {
-            LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 0);
+            else
+            {
+                hw.SetLed(i, 0, 0, 0);
+            }
         }
     }
 
@@ -236,6 +234,11 @@ namespace wreath
     {
         if (!looper.IsStartingUp())
         {
+            if (looper.IsBuffering())
+            {
+                LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 0);
+            }
+
             if (hw.tap.RisingEdge())
             {
                 if (looper.IsBuffering())
