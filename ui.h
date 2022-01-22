@@ -11,21 +11,25 @@ namespace wreath
     using namespace daisy;
     using namespace daisysp;
 
-    float knobValues[7]{};
+    float knobValues[4][7]{};
     Color colors[7];
+
     enum class MenuClickOp
     {
         TRIGGER,
         CLEAR,
         RESET,
+        EDIT,
     };
     MenuClickOp clickOp{MenuClickOp::TRIGGER};
+    bool buttonPressed{};
 
     StereoLooper::TriggerMode currentTriggerMode{};
     char currentLooper{StereoLooper::BOTH};
     bool noteMode{};
+    bool flangerMode{};
     bool gateTriggered{};
-    bool potChanged{};
+    bool knobChanged{};
     float startTime{};
 
     UiEventQueue eventQueue;
@@ -123,7 +127,7 @@ namespace wreath
         return bMin + k * (value - aMin);
     }
 
-    inline void ProcessPot(int idx)
+    inline void ProcessKnob(int idx)
     {
         float value = knobs[idx].Process();
         // Handle range limits.
@@ -135,7 +139,7 @@ namespace wreath
         {
             value = 1.f;
         }
-        if (std::abs(knobValues[idx] - value) > kMinValueDelta)
+        if (std::abs(knobValues[currentLooper][idx] - value) > kMinValueDelta)
         {
             LedMeter(value, idx);
             switch (idx)
@@ -164,27 +168,32 @@ namespace wreath
                         {
                             looper.SetLoopLength(currentLooper, Map(value, 0.f, 0.3f, bufferSamples, kMinSamplesForTone));
                             noteMode = false;
+                            flangerMode = false;
                         }
                         else if (value < 0.45f)
                         {
                             looper.SetLoopLength(currentLooper, Map(value, 0.3f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
                             noteMode = false;
+                            flangerMode = false;
                         }
                         else if (value > 0.55f && value < 0.7f)
                         {
                             looper.SetLoopLength(currentLooper, Map(value, 0.55f, 0.7f, kMinLoopLengthSamples, kMinSamplesForTone));
                             noteMode = false;
+                            flangerMode = true;
                         }
                         else if (value > 0.7f)
                         {
                             looper.SetLoopLength(currentLooper, Map(value, 0.7f, 1.f, kMinSamplesForTone, bufferSamples));
                             noteMode = false;
+                            flangerMode = false;
                         }
                         // Center dead zone.
                         else
                         {
                             looper.SetLoopLength(currentLooper, kMinLoopLengthSamples);
                             noteMode = true;
+                            flangerMode = false;
                         }
                     }
                     break;
@@ -201,6 +210,11 @@ namespace wreath
                         float n = Map(value, 0.f, 1.f, -48, 12);
                         float rate = std::pow(2.f, n / 12);
                         looper.SetReadRate(currentLooper, rate);
+                    }
+                    else if (flangerMode)
+                    {
+                        int32_t step = static_cast<int32_t>(value * 4);
+                        looper.SetReadRate(currentLooper, Map(step, 0, 3, 0.f, 1.f));
                     }
                     else
                     {
@@ -227,18 +241,18 @@ namespace wreath
                 default:
                     break;
             }
-            knobValues[idx] = value;
-            if (!potChanged)
+            knobValues[currentLooper][idx] = value;
+            if (!knobChanged)
             {
-                potChanged = true;
+                knobChanged = true;
             }
         }
         else
         {
-            if (potChanged)
+            if (knobChanged)
             {
                 startTime = ms;
-                potChanged = false;
+                knobChanged = false;
             }
             else
             {
@@ -257,48 +271,79 @@ namespace wreath
             if (looper.IsBuffering())
             {
                 LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 7);
-            }
-
-            if (hw.tap.RisingEdge())
-            {
-                if (looper.IsBuffering())
+                if (hw.tap.FallingEdge())
                 {
                     // Stop buffering.
                     looper.mustStopBuffering = true;
                 }
-                else
+            }
+            else
+            {
+                HandleLooperSwitch();
+                HandleTriggerSwitch();
+
+                if (hw.tap.RisingEdge())
                 {
-                    if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
+                    buttonPressed = true;
+                }
+
+                if (hw.tap.FallingEdge() && buttonPressed)
+                {
+                    buttonPressed = false;
+                    switch (clickOp)
                     {
-                        looper.dryLevel_ = 1.0f;
-                        looper.mustRestartRead = true;
+                        case MenuClickOp::TRIGGER:
+                            if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
+                            {
+                                looper.dryLevel_ = 1.0f;
+                                looper.mustRestartRead = true;
+                            }
+                            else
+                            {
+                                looper.mustRestart = true;
+                            }
+                            break;
+                        case MenuClickOp::CLEAR:
+                            looper.mustClearBuffer = true;
+                            clickOp = MenuClickOp::TRIGGER;
+                            break;
+                        case MenuClickOp::RESET:
+                            looper.mustResetLooper = true;
+                            clickOp = MenuClickOp::TRIGGER;
+                            break;
+                        case MenuClickOp::EDIT:
+                            clickOp = MenuClickOp::TRIGGER;
+                            break;
+                    }
+                }
+
+                if (buttonPressed)
+                {
+                    if (StereoLooper::BOTH == currentLooper)
+                    {
+                        if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
+                        {
+                            looper.dryLevel_ = 0.f;
+                        }
+                        // Handle button time held only when the trigger mode is not gate.
+                        else
+                        {
+                            // Clear the buffer if the button has been held more than 2 sec.
+                            if (hw.tap.TimeHeldMs() >= 2000.f)
+                            {
+                                clickOp = MenuClickOp::CLEAR;
+                            }
+                            // Reset the looper if the button has been held more than 5 sec.
+                            if (hw.tap.TimeHeldMs() >= 5000.f)
+                            {
+                                clickOp = MenuClickOp::RESET;
+                            }
+                        }
                     }
                     else
                     {
-                        looper.mustRestart = true;
+                        clickOp = MenuClickOp::EDIT;
                     }
-                }
-            }
-            if (hw.tap.FallingEdge())
-            {
-                if (!looper.IsBuffering())
-                {
-                    if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
-                    {
-                        looper.dryLevel_ = 0.f;
-                    }
-                }
-            }
-
-            if (!looper.IsBuffering())
-            {
-                if (hw.tap.TimeHeldMs() >= 1000.f)
-                {
-                    clickOp = MenuClickOp::CLEAR;
-                }
-                if (hw.tap.TimeHeldMs() >= 5000.f)
-                {
-                    clickOp = MenuClickOp::RESET;
                 }
 
                 if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
@@ -306,7 +351,7 @@ namespace wreath
                     if (hw.Gate())
                     {
                         looper.dryLevel_ = 1.0f;
-                        looper.mustRestartRead = true;
+                        //looper.mustRestartRead = true;
                         gateTriggered = true;
                     }
                     else if (gateTriggered) {
@@ -319,17 +364,21 @@ namespace wreath
                     looper.mustRestart = true;
                 }
 
-                HandleLooperSwitch();
-                HandleTriggerSwitch();
-
-                ProcessPot(DaisyVersio::KNOB_5); // Rate
-                ProcessPot(DaisyVersio::KNOB_3); // Flip
-                ProcessPot(DaisyVersio::KNOB_1); // Start
-                ProcessPot(DaisyVersio::KNOB_2); // Tone
-                ProcessPot(DaisyVersio::KNOB_4); // Decay
-                ProcessPot(DaisyVersio::KNOB_6); // Thaw
-                ProcessPot(DaisyVersio::KNOB_0); // Blend
+                if (StereoLooper::BOTH == currentLooper || MenuClickOp::EDIT == clickOp)
+                {
+                    ProcessKnob(DaisyVersio::KNOB_3); // Size
+                    ProcessKnob(DaisyVersio::KNOB_1); // Start
+                }
             }
+
+            if (StereoLooper::BOTH == currentLooper || MenuClickOp::EDIT == clickOp)
+            {
+                ProcessKnob(DaisyVersio::KNOB_5); // Rate
+            }
+            ProcessKnob(DaisyVersio::KNOB_4); // Decay
+            ProcessKnob(DaisyVersio::KNOB_2); // Tone
+            ProcessKnob(DaisyVersio::KNOB_6); // Freeze
+            ProcessKnob(DaisyVersio::KNOB_0); // Blend
         }
     }
 
