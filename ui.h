@@ -25,6 +25,8 @@ namespace wreath
     char currentLooper{StereoLooper::BOTH};
     bool noteMode{};
     bool gateTriggered{};
+    bool potChanged{};
+    float startTime{};
 
     UiEventQueue eventQueue;
 
@@ -124,18 +126,17 @@ namespace wreath
     inline void ProcessPot(int idx)
     {
         float value = knobs[idx].Process();
-        bool isChanging = std::abs(knobValues[idx] - value) > kMinValueDelta;
-        if (isChanging)
+        // Handle range limits.
+        if (value < kMinValueDelta)
         {
-            // Handle range limits.
-            if (value < kMinValueDelta)
-            {
-                value = 0.f;
-            }
-            else if (value > 1 - kMinValueDelta)
-            {
-                value = 1.f;
-            }
+            value = 0.f;
+        }
+        else if (value > 1 - kMinValueDelta)
+        {
+            value = 1.f;
+        }
+        if (std::abs(knobValues[idx] - value) > kMinValueDelta)
+        {
             LedMeter(value, idx);
             switch (idx)
             {
@@ -179,7 +180,7 @@ namespace wreath
                             looper.SetLoopLength(currentLooper, Map(value, 0.7f, 1.f, kMinSamplesForTone, bufferSamples));
                             noteMode = false;
                         }
-                        // Dead center zone.
+                        // Center dead zone.
                         else
                         {
                             looper.SetLoopLength(currentLooper, kMinLoopLengthSamples);
@@ -211,14 +212,14 @@ namespace wreath
                         {
                             looper.SetReadRate(currentLooper, Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult));
                         }
-                        // Dead center zone.
+                        // Center dead zone.
                         else
                         {
                             looper.SetReadRate(currentLooper, 1.f);
                         }
                     }
                     break;
-                // Thaw
+                // Freeze
                 case DaisyVersio::KNOB_6:
                     looper.SetFreeze(value);
                     break;
@@ -227,6 +228,25 @@ namespace wreath
                     break;
             }
             knobValues[idx] = value;
+            if (!potChanged)
+            {
+                potChanged = true;
+            }
+        }
+        else
+        {
+            if (potChanged)
+            {
+                startTime = ms;
+                potChanged = false;
+            }
+            else
+            {
+                if (ms - startTime > 350.f)
+                {
+                    ClearLeds();
+                }
+            }
         }
     }
 
@@ -236,7 +256,7 @@ namespace wreath
         {
             if (looper.IsBuffering())
             {
-                LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 0);
+                LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 7);
             }
 
             if (hw.tap.RisingEdge())
@@ -315,12 +335,13 @@ namespace wreath
 
     inline void InitUi()
     {
-        colors[DaisyVersio::KNOB_0].Init(1.f, 1.f, 0.f); // Yellow
-        colors[DaisyVersio::KNOB_1].Init(1.f, 0.f, 1.f); // Magenta
-        colors[DaisyVersio::KNOB_2].Init(0.f, 1.f, 1.f); // Cyan
-        colors[DaisyVersio::KNOB_3].Init(0.1f, 0.f, 0.5f);
-        colors[DaisyVersio::KNOB_4].Init(0.5f, 0.1f, 0.f);
-        colors[DaisyVersio::KNOB_5].Init(0.f, 0.5f, 0.1f);
-        colors[DaisyVersio::KNOB_6].Init(1.f, 1.f, 1.f); // White
+        colors[DaisyVersio::KNOB_0].Init(0.5f, 0.f, 1.f); // Purple
+        colors[DaisyVersio::KNOB_1].Init(0.f, 1.f, 0.5f); // Green
+        colors[DaisyVersio::KNOB_2].Init(0.f, 0.f, 1.f); // Blue
+        colors[DaisyVersio::KNOB_3].Init(1.f, 0.8f, 0.5f); // Yellow
+        colors[DaisyVersio::KNOB_4].Init(1.f, 0.f, 1.f); // Magenta
+        colors[DaisyVersio::KNOB_5].Init(1.f, 0.5f, 0.f); // Orange
+        colors[DaisyVersio::KNOB_6].Init(0.5f, 0.5f, 1.f); // Light blue
+        colors[7].Init(1.f, 0.f, 0.f); // Red
     }
 }
