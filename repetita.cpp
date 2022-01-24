@@ -27,7 +27,6 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
 int main(void)
 {
     InitHw();
-    InitUi();
 
     StereoLooper::Conf conf
     {
@@ -40,10 +39,12 @@ int main(void)
 
     looper.Init(hw.AudioSampleRate(), conf);
 
+    InitUi();
+
     hw.StartAudio(AudioCallback);
 
     while (1)
     {
-        ProcessUi();
+        //ProcessUi();
     }
 }

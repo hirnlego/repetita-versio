@@ -11,7 +11,8 @@ namespace wreath
     using namespace daisy;
     using namespace daisysp;
 
-    float knobValues[4][7]{};
+    float knobUpdates[7]{};
+    float knobValues[3][7]{};
     Color colors[7];
 
     enum class MenuClickOp
@@ -25,39 +26,45 @@ namespace wreath
     bool buttonPressed{};
 
     StereoLooper::TriggerMode currentTriggerMode{};
-    char currentLooper{StereoLooper::BOTH};
+    short currentLooper{StereoLooper::BOTH};
     bool noteMode{};
     bool flangerMode{};
     bool gateTriggered{};
     bool knobChanged{};
-    float startTime{};
+    bool mustTurnOffLeds{};
+    float knobChangeStartTime{};
+    float buttonHoldStartTime{};
+
+    enum KnobStatus
+    {
+        MOVING,
+        STILL,
+        LEDSON,
+        LEDSOFF,
+    };
+    KnobStatus knobStatus{KnobStatus::STILL};
 
     UiEventQueue eventQueue;
 
     // 0: center, 1: left, 2: right
     static void HandleLooperSwitch()
     {
-        static char currentValue{};
-        char value = hw.sw[DaisyVersio::SW_0].Read();
-        if (value == currentValue)
+        short value = hw.sw[DaisyVersio::SW_0].Read() - 1;
+        value = value < 0 ? 2 : value;
+        if (value == currentLooper)
         {
             return;
         }
-        currentValue = value;
 
+        currentLooper = value;
         switch (value)
         {
         case 0:
-            currentLooper = StereoLooper::BOTH;
-            looper.SetMode(StereoLooper::Mode::MONO);
-            break;
         case 1:
-            currentLooper = StereoLooper::LEFT;
             looper.SetMode(StereoLooper::Mode::DUAL);
             break;
         case 2:
-            currentLooper = StereoLooper::RIGHT;
-            looper.SetMode(StereoLooper::Mode::DUAL);
+            looper.SetMode(StereoLooper::Mode::MONO);
             break;
         default:
             break;
@@ -67,27 +74,13 @@ namespace wreath
     // 0: center, 1: left, 2: right
     static void HandleTriggerSwitch()
     {
-        char value = hw.sw[DaisyVersio::SW_1].Read();
+        short value = hw.sw[DaisyVersio::SW_1].Read();
         if (value == currentTriggerMode)
         {
             return;
         }
 
-        switch (value)
-        {
-        case 0:
-            currentTriggerMode = StereoLooper::TriggerMode::TRIGGER;
-            break;
-        case 1:
-            currentTriggerMode = StereoLooper::TriggerMode::GATE;
-            break;
-        case 2:
-            currentTriggerMode = StereoLooper::TriggerMode::LOOP;
-            break;
-        default:
-            break;
-        }
-
+        currentTriggerMode = static_cast<StereoLooper::TriggerMode>(value);
         looper.SetTriggerMode(currentTriggerMode);
     }
 
@@ -127,40 +120,36 @@ namespace wreath
         return bMin + k * (value - aMin);
     }
 
-    inline void ProcessKnob(int idx)
+    inline void ProcessParameter(short idx, float value)
     {
-        float value = knobs[idx].Process();
-        // Handle range limits.
-        if (value < kMinValueDelta)
+        switch (idx)
         {
-            value = 0.f;
-        }
-        else if (value > 1 - kMinValueDelta)
-        {
-            value = 1.f;
-        }
-        if (std::abs(knobValues[currentLooper][idx] - value) > kMinValueDelta)
-        {
-            LedMeter(value, idx);
-            switch (idx)
-            {
-                // Blend
-                case DaisyVersio::KNOB_0:
-                    looper.nextMix = value;
-                    break;
-                // Start
-                case DaisyVersio::KNOB_1:
+            // Blend
+            case DaisyVersio::KNOB_0:
+                looper.nextMix = value;
+                break;
+            // Start
+            case DaisyVersio::KNOB_1:
+                {
+                    if (looper.IsDualMode())
                     {
-                        int32_t loopEnd = looper.IsDualMode() ? looper.GetLoopEnd(currentLooper) : looper.GetLoopEnd(StereoLooper::LEFT);
-                        looper.SetLoopStart(currentLooper, Map(value, 0.f, 1.f, 0.f, loopEnd));
+                        looper.SetLoopStart(currentLooper, Map(value, 0.f, 1.f, 0.f, looper.GetLoopEnd(currentLooper)));
                     }
-                    break;
-                // Tone
-                case DaisyVersio::KNOB_2:
-                    looper.nextFilterValue = Map(value, 0.f, 1.f, 0.f, 1000.f);
-                    break;
-                // Flip
-                case DaisyVersio::KNOB_3:
+                    else
+                    {
+                        looper.SetLoopStart(StereoLooper::LEFT, Map(knobValues[StereoLooper::LEFT][idx] + value, 0.f, 1.f, 0.f, looper.GetLoopEnd(StereoLooper::LEFT)));
+                        looper.SetLoopStart(StereoLooper::RIGHT, Map(knobValues[StereoLooper::RIGHT][idx] + value, 0.f, 1.f, 0.f, looper.GetLoopEnd(StereoLooper::RIGHT)));
+                    }
+                }
+                break;
+            // Tone
+            case DaisyVersio::KNOB_2:
+                looper.nextFilterValue = Map(value, 0.f, 1.f, 0.f, 1000.f);
+                break;
+            // Flip
+            case DaisyVersio::KNOB_3:
+                {
+                    if (looper.IsDualMode())
                     {
                         looper.SetDirection(currentLooper, value < 0.5f ? Direction::BACKWARDS : Direction::FORWARD);
                         int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(currentLooper) : looper.GetBufferSamples(StereoLooper::LEFT);
@@ -196,13 +185,21 @@ namespace wreath
                             flangerMode = false;
                         }
                     }
-                    break;
-                // Decay
-                case DaisyVersio::KNOB_4:
-                    looper.nextFeedback = value;
-                    break;
-                // Speed
-                case DaisyVersio::KNOB_5:
+                    else
+                    {
+                        looper.SetLoopLength(StereoLooper::LEFT, knobValues[StereoLooper::LEFT][idx] * value);
+                        looper.SetLoopLength(StereoLooper::RIGHT, knobValues[StereoLooper::RIGHT][idx] * value);
+                    }
+                }
+                break;
+            // Decay
+            case DaisyVersio::KNOB_4:
+                looper.nextFeedback = value;
+                break;
+            // Speed
+            case DaisyVersio::KNOB_5:
+                if (looper.IsDualMode())
+                {
                     if (noteMode)
                     {
                         // In "note" mode, the rate knob sets the pitch, with 5
@@ -213,6 +210,7 @@ namespace wreath
                     }
                     else if (flangerMode)
                     {
+                        // TODO
                         int32_t step = static_cast<int32_t>(value * 4);
                         looper.SetReadRate(currentLooper, Map(step, 0, 3, 0.f, 1.f));
                     }
@@ -232,49 +230,144 @@ namespace wreath
                             looper.SetReadRate(currentLooper, 1.f);
                         }
                     }
-                    break;
-                // Freeze
-                case DaisyVersio::KNOB_6:
-                    looper.SetFreeze(value);
-                    break;
+                }
+                else
+                {
+                    looper.SetReadRate(StereoLooper::LEFT, knobValues[StereoLooper::LEFT][idx] + value);
+                    looper.SetReadRate(StereoLooper::RIGHT, knobValues[StereoLooper::RIGHT][idx] + value);
+                }
+                /*
+                if (noteMode)
+                {
+                    // In "note" mode, the rate knob sets the pitch, with 5
+                    // octaves span.
+                    float n = Map(value, 0.f, 1.f, -48, 12);
+                    float rate = std::pow(2.f, n / 12);
+                    looper.SetReadRate(currentLooper, rate);
+                }
+                else if (flangerMode)
+                {
+                    int32_t step = static_cast<int32_t>(value * 4);
+                    looper.SetReadRate(currentLooper, Map(step, 0, 3, 0.f, 1.f));
+                }
+                else
+                {
+                    if (value < 0.45f)
+                    {
+                        looper.SetReadRate(currentLooper, Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f));
+                    }
+                    else if (value > 0.55f)
+                    {
+                        looper.SetReadRate(currentLooper, Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult));
+                    }
+                    // Center dead zone.
+                    else
+                    {
+                        looper.SetReadRate(currentLooper, 1.f);
+                    }
+                }
+                */
+                break;
+            // Freeze
+            case DaisyVersio::KNOB_6:
+                looper.SetFreeze(value);
+                break;
 
-                default:
-                    break;
-            }
-            knobValues[currentLooper][idx] = value;
-            if (!knobChanged)
-            {
-                knobChanged = true;
-            }
+            default:
+                break;
         }
-        else
+        knobValues[currentLooper][idx] = value;
+    }
+
+    bool mustPickUp{};
+
+    inline void ProcessKnob(int idx, bool hasPickup)
+    {
+        float value = knobs[idx].Process();
+        // Handle range limits.
+        if (value < kMinValueDelta)
         {
-            if (knobChanged)
+            value = 0.f;
+        }
+        else if (value > 1 - kMinValueDelta)
+        {
+            value = 1.f;
+        }
+
+        // Process the parameter only if the knob is actually moving.
+        if (std::abs(knobUpdates[idx] - value) > kMinValueDelta)
+        {
+            if (hasPickup)
             {
-                startTime = ms;
-                knobChanged = false;
+                ClearLeds();
+                float v = std::abs(knobValues[currentLooper][idx] - value);
+                short l = value > knobValues[currentLooper][idx] ? 1 - std::round(v) : 2 + std::round(v);
+                mustPickUp = v > kMinPickupValueDelta;
+                if (mustPickUp)
+                {
+                    hw.SetLed(l, 1.f, 1.f, 1.f);
+                }
+                else
+                {
+                    ProcessParameter(idx, value);
+                }
             }
             else
             {
-                if (ms - startTime > 350.f)
-                {
-                    ClearLeds();
-                }
+                ProcessParameter(idx, value);
             }
+
+            knobUpdates[idx] = value;
         }
     }
 
+    short buttonWorkflow{};
+
     inline void ProcessUi()
     {
-        if (!looper.IsStartingUp())
+        if (looper.IsStartingUp())
         {
+            // Init the parameters that, at this moment, can be safely set to
+            // their respective knobs values (those not affected by the initial
+            // buffering).
+            knobUpdates[DaisyVersio::KNOB_0] = knobs[DaisyVersio::KNOB_0].Process(); // Blend
+            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_0] = knobUpdates[DaisyVersio::KNOB_0];
+            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_0] = knobUpdates[DaisyVersio::KNOB_0];
+            ProcessParameter(DaisyVersio::KNOB_0, knobUpdates[DaisyVersio::KNOB_0]);
+            knobUpdates[DaisyVersio::KNOB_2] = knobs[DaisyVersio::KNOB_2].Process(); // Tone
+            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_2] = knobUpdates[DaisyVersio::KNOB_2];
+            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_2] = knobUpdates[DaisyVersio::KNOB_2];
+            ProcessParameter(DaisyVersio::KNOB_2, knobUpdates[DaisyVersio::KNOB_2]);
+            knobUpdates[DaisyVersio::KNOB_4] = knobs[DaisyVersio::KNOB_4].Process(); // Decay
+            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_4] = knobUpdates[DaisyVersio::KNOB_4];
+            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_4] = knobUpdates[DaisyVersio::KNOB_4];
+            ProcessParameter(DaisyVersio::KNOB_4, knobUpdates[DaisyVersio::KNOB_4]);
+            knobUpdates[DaisyVersio::KNOB_5] = knobs[DaisyVersio::KNOB_5].Process(); // Rate
+            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_5] = knobUpdates[DaisyVersio::KNOB_5];
+            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_5] = knobUpdates[DaisyVersio::KNOB_5];
+            ProcessParameter(DaisyVersio::KNOB_5, knobUpdates[DaisyVersio::KNOB_5]);
+
+            // The others, just init the variables.
+            knobUpdates[DaisyVersio::KNOB_1] = knobs[DaisyVersio::KNOB_1].Process(); // Start
+            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_1] = knobUpdates[DaisyVersio::KNOB_1];
+            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_1] = knobUpdates[DaisyVersio::KNOB_1];
+            knobUpdates[DaisyVersio::KNOB_3] = knobs[DaisyVersio::KNOB_3].Process(); // Size
+            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_3] = knobUpdates[DaisyVersio::KNOB_3];
+            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_3] = knobUpdates[DaisyVersio::KNOB_3];
+            knobUpdates[DaisyVersio::KNOB_6] = knobs[DaisyVersio::KNOB_6].Process(); // Freeze
+            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_6] = knobUpdates[DaisyVersio::KNOB_6];
+            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_6] = knobUpdates[DaisyVersio::KNOB_6];
+        }
+        else {
             if (looper.IsBuffering())
             {
                 LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 7);
-                if (hw.tap.FallingEdge())
+                if (hw.tap.RisingEdge() && !buttonWorkflow)
                 {
                     // Stop buffering.
                     looper.mustStopBuffering = true;
+                    ClearLeds();
+                    //buttonWorkflow++;
                 }
             }
             else
@@ -282,14 +375,20 @@ namespace wreath
                 HandleLooperSwitch();
                 HandleTriggerSwitch();
 
-                if (hw.tap.RisingEdge())
+                // Handle button press.
+                if (hw.tap.RisingEdge() && !buttonWorkflow)
                 {
-                    buttonPressed = true;
+                    if (StereoLooper::BOTH == currentLooper)
+                    {
+                        buttonHoldStartTime = ms;
+                    }
+                    buttonWorkflow = 1;
                 }
 
-                if (hw.tap.FallingEdge() && buttonPressed)
+                // Handle button release.
+                else if (hw.tap.FallingEdge() && buttonWorkflow)
                 {
-                    buttonPressed = false;
+                    buttonWorkflow = 0;
                     switch (clickOp)
                     {
                         case MenuClickOp::TRIGGER:
@@ -303,21 +402,14 @@ namespace wreath
                                 looper.mustRestart = true;
                             }
                             break;
-                        case MenuClickOp::CLEAR:
-                            looper.mustClearBuffer = true;
-                            clickOp = MenuClickOp::TRIGGER;
-                            break;
-                        case MenuClickOp::RESET:
-                            looper.mustResetLooper = true;
-                            clickOp = MenuClickOp::TRIGGER;
-                            break;
                         case MenuClickOp::EDIT:
                             clickOp = MenuClickOp::TRIGGER;
                             break;
                     }
                 }
 
-                if (buttonPressed)
+                // Do something while the button is pressed.
+                if (buttonWorkflow)
                 {
                     if (StereoLooper::BOTH == currentLooper)
                     {
@@ -328,15 +420,30 @@ namespace wreath
                         // Handle button time held only when the trigger mode is not gate.
                         else
                         {
+                            size_t time = ms - buttonHoldStartTime;
                             // Clear the buffer if the button has been held more than 2 sec.
-                            if (hw.tap.TimeHeldMs() >= 2000.f)
+                            if (1 == buttonWorkflow && time >= 2000.f)
                             {
-                                clickOp = MenuClickOp::CLEAR;
+                                LedMeter(1.f, 2);
+                                buttonWorkflow++;
+                            }
+                            if (2 == buttonWorkflow && time >= 2350.f)
+                            {
+                                ClearLeds();
+                                looper.mustClearBuffer = true;
+                                buttonWorkflow++;
                             }
                             // Reset the looper if the button has been held more than 5 sec.
-                            if (hw.tap.TimeHeldMs() >= 5000.f)
+                            if (3 == buttonWorkflow && time >= 5000.f)
                             {
-                                clickOp = MenuClickOp::RESET;
+                                LedMeter(1.f, 7);
+                                buttonWorkflow++;
+                            }
+                            if (4 == buttonWorkflow && time >= 5350.f)
+                            {
+                                ClearLeds();
+                                looper.mustResetLooper = true;
+                                buttonWorkflow = 0;
                             }
                         }
                     }
@@ -366,19 +473,17 @@ namespace wreath
 
                 if (StereoLooper::BOTH == currentLooper || MenuClickOp::EDIT == clickOp)
                 {
-                    ProcessKnob(DaisyVersio::KNOB_3); // Size
-                    ProcessKnob(DaisyVersio::KNOB_1); // Start
+                    //ProcessKnob(DaisyVersio::KNOB_1, true); // Start
+                    //ProcessKnob(DaisyVersio::KNOB_6, false); // Freeze
                 }
+
+                ProcessKnob(DaisyVersio::KNOB_3, true); // Size
             }
 
-            if (StereoLooper::BOTH == currentLooper || MenuClickOp::EDIT == clickOp)
-            {
-                ProcessKnob(DaisyVersio::KNOB_5); // Rate
-            }
-            ProcessKnob(DaisyVersio::KNOB_4); // Decay
-            ProcessKnob(DaisyVersio::KNOB_2); // Tone
-            ProcessKnob(DaisyVersio::KNOB_6); // Freeze
-            ProcessKnob(DaisyVersio::KNOB_0); // Blend
+            ProcessKnob(DaisyVersio::KNOB_0, false); // Blend
+            ProcessKnob(DaisyVersio::KNOB_2, false); // Tone
+            ProcessKnob(DaisyVersio::KNOB_4, false); // Decay
+            ProcessKnob(DaisyVersio::KNOB_5, true); // Rate
         }
     }
 
