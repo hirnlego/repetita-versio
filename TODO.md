@@ -1,9 +1,16 @@
+# TODO
+
+- bug: CV inputs don't work with parameters pick-up
 - bug; fix buffering leds when resetting the looper (does the looper reset correctly at all?)
 - bug; fix gate mode when changing the relation between read and write heads (loop length, ratio, freeze)
-- bug: don't use TimeHeldMs() for handling button hold, use the internal clock
+- realign read heads when loopers params have been successfully picked-up in mono mode
 - rework the size parameter to account for the longest loop
 - flanger mode -> rate
-- parameters affecting both loopers at the same time should be offsets of each looper's base parameters
-- nice to have: parameters pick-up, so the parameters don't have an immediate effect when switching the selected looper
 - clickless activation of the filter
 - button + mix knob = input gain
+
+## DONE
+
+- ~~bug: don't use TimeHeldMs() for handling button hold, use the internal clock~~
+- ~~parameters affecting both loopers at the same time should be offsets of each looper's base parameters~~
+- ~~nice to have: parameters pick-up, so the parameters don't have an immediate effect when switching the selected looper~~
