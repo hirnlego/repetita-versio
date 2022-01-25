@@ -1,5 +1,6 @@
 # TODO
 
+- bug: when coming from node mode we should update the rate parameter
 - bug: CV inputs don't work with parameters pick-up
 - bug; fix buffering leds when resetting the looper (does the looper reset correctly at all?)
 - bug; fix gate mode when changing the relation between read and write heads (loop length, ratio, freeze)

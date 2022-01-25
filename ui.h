@@ -11,6 +11,7 @@ namespace wreath
     using namespace daisy;
     using namespace daisysp;
 
+    short currentLooper{StereoLooper::BOTH};
     float knobUpdates[7]{};
     float knobValues[3][7]{};
     Color colors[7];
@@ -24,27 +25,13 @@ namespace wreath
     };
     MenuClickOp clickOp{MenuClickOp::TRIGGER};
     bool buttonPressed{};
-
     StereoLooper::TriggerMode currentTriggerMode{};
-    short currentLooper{StereoLooper::BOTH};
-    bool noteMode{};
-    bool flangerMode{};
     bool gateTriggered{};
-    bool knobChanged{};
-    bool mustTurnOffLeds{};
+
     float knobChangeStartTime{};
     float buttonHoldStartTime{};
-
-    enum KnobStatus
-    {
-        MOVING,
-        STILL,
-        LEDSON,
-        LEDSOFF,
-    };
-    KnobStatus knobStatus{KnobStatus::STILL};
-
-    UiEventQueue eventQueue;
+    bool mustPickUpLeft{};
+    bool mustPickUpRight{};
 
     // 0: center, 1: left, 2: right
     static void HandleLooperSwitch()
@@ -57,18 +44,6 @@ namespace wreath
         }
 
         currentLooper = value;
-        switch (value)
-        {
-        case 0:
-        case 1:
-            looper.SetMode(StereoLooper::Mode::DUAL);
-            break;
-        case 2:
-            looper.SetMode(StereoLooper::Mode::MONO);
-            break;
-        default:
-            break;
-        }
     }
 
     // 0: center, 1: left, 2: right
@@ -138,7 +113,7 @@ namespace wreath
             case DaisyVersio::KNOB_2:
                 looper.nextFilterValue = Map(value, 0.f, 1.f, 0.f, 1000.f);
                 break;
-            // Flip
+            // Size
             case DaisyVersio::KNOB_3:
                 {
                     looper.SetDirection(channel, value < 0.5f ? Direction::BACKWARDS : Direction::FORWARD);
@@ -146,55 +121,62 @@ namespace wreath
                     if (value < 0.3f)
                     {
                         looper.SetLoopLength(channel, Map(value, 0.f, 0.3f, bufferSamples, kMinSamplesForTone));
-                        noteMode = false;
-                        flangerMode = false;
                     }
                     else if (value < 0.45f)
                     {
                         looper.SetLoopLength(channel, Map(value, 0.3f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
-                        noteMode = false;
-                        flangerMode = false;
                     }
                     else if (value > 0.55f && value < 0.7f)
                     {
                         looper.SetLoopLength(channel, Map(value, 0.55f, 0.7f, kMinLoopLengthSamples, kMinSamplesForTone));
-                        noteMode = false;
-                        flangerMode = true;
                     }
                     else if (value > 0.7f)
                     {
                         looper.SetLoopLength(channel, Map(value, 0.7f, 1.f, kMinSamplesForTone, bufferSamples));
-                        noteMode = false;
-                        flangerMode = false;
                     }
                     // Center dead zone.
                     else
                     {
                         looper.SetLoopLength(channel, kMinLoopLengthSamples);
-                        noteMode = true;
-                        flangerMode = false;
                     }
+
+                    // Refresh the rate parameter if the note mode changes.
+                    static bool noteModeLeft{};
+                    if (noteModeLeft != looper.noteModeLeft)
+                    {
+                        ProcessParameter(DaisyVersio::KNOB_5, knobUpdates[DaisyVersio::KNOB_5], StereoLooper::LEFT);
+                    }
+                    noteModeLeft = looper.noteModeLeft;
+                    // Refresh the rate parameter if the note mode changes.
+                    static bool noteModeRight{};
+                    if (noteModeRight != looper.noteModeRight)
+                    {
+                        ProcessParameter(DaisyVersio::KNOB_5, knobUpdates[DaisyVersio::KNOB_5], StereoLooper::RIGHT);
+                    }
+                    noteModeRight = looper.noteModeRight;
                 }
                 break;
             // Decay
             case DaisyVersio::KNOB_4:
                 looper.nextFeedback = value;
                 break;
-            // Speed
+            // Rate
             case DaisyVersio::KNOB_5:
-                if (noteMode)
+                if (looper.noteModeLeft && StereoLooper::LEFT == channel)
                 {
                     // In "note" mode, the rate knob sets the pitch, with 5
                     // octaves span.
                     float n = Map(value, 0.f, 1.f, -48, 12);
                     float rate = std::pow(2.f, n / 12);
-                    looper.SetReadRate(channel, rate);
+                    looper.SetReadRate(StereoLooper::LEFT, rate);
                 }
-                else if (flangerMode)
+                else if (looper.noteModeRight && StereoLooper::RIGHT == channel)
                 {
-                    // TODO
-                    int32_t step = static_cast<int32_t>(value * 4);
-                    looper.SetReadRate(channel, Map(step, 0, 3, 0.f, 1.f));
+                    // In "note" mode, the rate knob sets the pitch, with 5
+                    // octaves span.
+                    float n = Map(value, 0.f, 1.f, -48, 12);
+                    float rate = std::pow(2.f, n / 12);
+                    looper.SetReadRate(StereoLooper::RIGHT, rate);
                 }
                 else
                 {
@@ -224,9 +206,6 @@ namespace wreath
         knobValues[channel][idx] = value;
     }
 
-    bool mustPickUpLeft{};
-    bool mustPickUpRight{};
-
     inline void ProcessKnob(int idx, bool hasPickup)
     {
         float value = knobs[idx].Process();
@@ -246,6 +225,8 @@ namespace wreath
             if (hasPickup)
             {
                 ClearLeds();
+
+                // Handle parameter pick-up for the left looper.
                 if (StereoLooper::BOTH == currentLooper || StereoLooper::LEFT == currentLooper)
                 {
                     float lv = std::abs(knobValues[StereoLooper::LEFT][idx] - value);
@@ -260,6 +241,7 @@ namespace wreath
                         ProcessParameter(idx, value, StereoLooper::LEFT);
                     }
                 }
+                // Handle parameter pick-up for the right looper.
                 if (StereoLooper::BOTH == currentLooper || StereoLooper::RIGHT == currentLooper)
                 {
                     float rv = std::abs(knobValues[StereoLooper::RIGHT][idx] - value);
@@ -322,6 +304,8 @@ namespace wreath
             knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_6] = knobUpdates[DaisyVersio::KNOB_6];
         }
         else {
+            HandleTriggerSwitch();
+
             if (looper.IsBuffering())
             {
                 LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 7);
@@ -336,7 +320,6 @@ namespace wreath
             else
             {
                 HandleLooperSwitch();
-                HandleTriggerSwitch();
 
                 // Handle button press.
                 if (hw.tap.RisingEdge() && !buttonWorkflow)
