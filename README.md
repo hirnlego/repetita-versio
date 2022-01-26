@@ -59,4 +59,33 @@ Versio: from Latin for “versatile”
 - center > one shot, restarts at loop start point;
 - right > continuously loops.
 
-**Trigger:** Gate/trigger, depends on the Flow switch.
+**Trigger:** Gate or trigger depending on the Flow switch.
+
+
+## Button operation:
+
+- while starting up = ?
+- while buffering = rising edge stop buffering
+- in mono mode (channel switch in center position):
+    - while recording in loop mode:
+        - rising edge start hold timer
+        - falling edge if time < 500 ms = trigger looper restart
+        - while holding, global edit mode:
+            - blend knob = gain level
+            - tone knob = BP filter resonance (?)
+            - rate knob = rate slew time (?)
+            - freeze knob = at noon clears buffer, CW resets looper
+    - while recording in trigger mode:
+        - rising edge start hold timer
+        - falling edge if time < 500 ms = trigger looper restart
+        - while holding, global edit mode:
+            - blend knob = gain level
+            - tone knob = BP filter resonance (?)
+            - rate knob = rate slew time (?)
+            - freeze knob = at noon clears buffer, CW resets looper
+    - while recording in gate mode:
+        - rising edge = looper play on
+        - falling edge = looper play off
+- in dual mode (channel switch in either left or right position):
+    - trigger and gate as above, but in trigger mode:
+        - while holding, channel edit mode with pick-up

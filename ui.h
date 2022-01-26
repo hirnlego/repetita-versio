@@ -11,53 +11,30 @@ namespace wreath
     using namespace daisy;
     using namespace daisysp;
 
-    short currentLooper{StereoLooper::BOTH};
-    float knobUpdates[7]{};
-    float knobValues[3][7]{};
+    constexpr float kMaxMsHoldForTrigger{250.f};
+
+    short currentChannel{StereoLooper::BOTH};
+    float channelValues[3][7]{};
+    float knobValues[7]{};
+    float globalValues[7]{};
     Color colors[7];
 
-    enum class MenuClickOp
+    enum class ButtonOp
     {
-        TRIGGER,
+        NORMAL,
         CLEAR,
         RESET,
         EDIT,
     };
-    MenuClickOp clickOp{MenuClickOp::TRIGGER};
-    bool buttonPressed{};
+    ButtonOp buttonOp{ButtonOp::NORMAL};
     StereoLooper::TriggerMode currentTriggerMode{};
+    bool buttonPressed{};
     bool gateTriggered{};
-
+    bool editMode{};
     float knobChangeStartTime{};
     float buttonHoldStartTime{};
     bool mustPickUpLeft{};
     bool mustPickUpRight{};
-
-    // 0: center, 1: left, 2: right
-    static void HandleLooperSwitch()
-    {
-        short value = hw.sw[DaisyVersio::SW_0].Read() - 1;
-        value = value < 0 ? 2 : value;
-        if (value == currentLooper)
-        {
-            return;
-        }
-
-        currentLooper = value;
-    }
-
-    // 0: center, 1: left, 2: right
-    static void HandleTriggerSwitch()
-    {
-        short value = hw.sw[DaisyVersio::SW_1].Read();
-        if (value == currentTriggerMode)
-        {
-            return;
-        }
-
-        currentTriggerMode = static_cast<StereoLooper::TriggerMode>(value);
-        looper.SetTriggerMode(currentTriggerMode);
-    }
 
     inline void ClearLeds()
     {
@@ -95,18 +72,74 @@ namespace wreath
         return bMin + k * (value - aMin);
     }
 
-    inline void ProcessParameter(short idx, float value, short channel)
+    void EditMode(bool active)
     {
+        editMode = active;
+        active ? LedMeter(1.f, 7) : ClearLeds();
+    }
+
+    // 0: center, 1: left, 2: right
+    static void HandleChannelSwitch()
+    {
+        short value = hw.sw[DaisyVersio::SW_0].Read() - 1;
+        value = value < 0 ? 2 : value;
+        if (value == currentChannel)
+        {
+            return;
+        }
+        currentChannel = value;
+
+        // Quit edit mode when changing.
+        if (editMode)
+        {
+            EditMode(false);
+        }
+    }
+
+    // 0: center, 1: left, 2: right
+    static void HandleTriggerSwitch()
+    {
+        short value = hw.sw[DaisyVersio::SW_1].Read();
+        if (value == currentTriggerMode)
+        {
+            return;
+        }
+
+        currentTriggerMode = static_cast<StereoLooper::TriggerMode>(value);
+        looper.SetTriggerMode(currentTriggerMode);
+    }
+
+    inline void ProcessParameter(short idx, float value, short channel, bool global)
+    {
+        if (!looper.IsStartingUp())
+        {
+            if (editMode || global)
+            {
+                globalValues[idx] = value;
+            }
+            else {
+                channelValues[channel][idx] = value;
+            }
+        }
+
         switch (idx)
         {
             // Blend
             case DaisyVersio::KNOB_0:
-                looper.nextMix = value;
+                if (editMode)
+                {
+                    looper.nextGain = value * 5;
+                }
+                else
+                {
+                    looper.nextMix = value;
+                }
                 break;
             // Start
             case DaisyVersio::KNOB_1:
                 {
-                    looper.SetLoopStart(channel, Map(value, 0.f, 1.f, 0.f, looper.GetLoopEnd(channel)));
+                    int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(channel) : looper.GetBufferSamples(StereoLooper::LEFT);
+                    looper.SetLoopStart(channel, Map(value, 0.f, 1.f, 0.f, bufferSamples));
                 }
                 break;
             // Tone
@@ -116,42 +149,46 @@ namespace wreath
             // Size
             case DaisyVersio::KNOB_3:
                 {
-                    looper.SetDirection(channel, value < 0.5f ? Direction::BACKWARDS : Direction::FORWARD);
                     int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(channel) : looper.GetBufferSamples(StereoLooper::LEFT);
-                    if (value < 0.3f)
+                    if (value <= 0.35f)
                     {
-                        looper.SetLoopLength(channel, Map(value, 0.f, 0.3f, bufferSamples, kMinSamplesForTone));
+                        looper.SetLoopLength(channel, Map(value, 0.f, 0.35f, bufferSamples, kMinSamplesForTone));
+                        looper.SetDirection(channel, Direction::BACKWARDS);
                     }
-                    else if (value < 0.45f)
+                    else if (value <= 0.45f)
                     {
-                        looper.SetLoopLength(channel, Map(value, 0.3f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
+                        looper.SetLoopLength(channel, Map(value, 0.35f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
+                        looper.SetDirection(channel, Direction::BACKWARDS);
                     }
-                    else if (value > 0.55f && value < 0.7f)
+                    else if (value >= 0.55f && value < 0.65f)
                     {
-                        looper.SetLoopLength(channel, Map(value, 0.55f, 0.7f, kMinLoopLengthSamples, kMinSamplesForTone));
+                        looper.SetLoopLength(channel, Map(value, 0.55f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
+                        looper.SetDirection(channel, Direction::FORWARD);
                     }
-                    else if (value > 0.7f)
+                    else if (value >= 0.65f)
                     {
-                        looper.SetLoopLength(channel, Map(value, 0.7f, 1.f, kMinSamplesForTone, bufferSamples));
+                        looper.SetLoopLength(channel, Map(value, 0.65f, 1.f, kMinSamplesForTone, bufferSamples));
+                        looper.SetDirection(channel, Direction::FORWARD);
                     }
                     // Center dead zone.
                     else
                     {
                         looper.SetLoopLength(channel, kMinLoopLengthSamples);
+                        looper.SetDirection(channel, Direction::FORWARD);
                     }
 
                     // Refresh the rate parameter if the note mode changes.
                     static bool noteModeLeft{};
                     if (noteModeLeft != looper.noteModeLeft)
                     {
-                        ProcessParameter(DaisyVersio::KNOB_5, knobUpdates[DaisyVersio::KNOB_5], StereoLooper::LEFT);
+                        ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], StereoLooper::LEFT, false);
                     }
                     noteModeLeft = looper.noteModeLeft;
                     // Refresh the rate parameter if the note mode changes.
                     static bool noteModeRight{};
                     if (noteModeRight != looper.noteModeRight)
                     {
-                        ProcessParameter(DaisyVersio::KNOB_5, knobUpdates[DaisyVersio::KNOB_5], StereoLooper::RIGHT);
+                        ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], StereoLooper::RIGHT, false);
                     }
                     noteModeRight = looper.noteModeRight;
                 }
@@ -197,16 +234,21 @@ namespace wreath
                 break;
             // Freeze
             case DaisyVersio::KNOB_6:
-                looper.SetFreeze(value);
+                if (editMode)
+                {
+                }
+                else
+                {
+                    looper.SetFreeze(value);
+                }
                 break;
 
             default:
                 break;
         }
-        knobValues[channel][idx] = value;
     }
 
-    inline void ProcessKnob(int idx, bool hasPickup)
+    inline void ProcessKnob(int idx)
     {
         float value = knobs[idx].Process();
         // Handle range limits.
@@ -219,54 +261,55 @@ namespace wreath
             value = 1.f;
         }
 
-        // Process the parameter only if the knob is actually moving.
-        if (std::abs(knobUpdates[idx] - value) > kMinValueDelta)
+        // Process the parameter only if the there's actually a change.
+        if (std::abs(knobValues[idx] - value) > kMinValueDelta)
         {
-            if (hasPickup)
+            // In mono mode, update the parameter right away.
+            if (StereoLooper::BOTH == currentChannel && !editMode)
             {
-                ClearLeds();
-
-                // Handle parameter pick-up for the left looper.
-                if (StereoLooper::BOTH == currentLooper || StereoLooper::LEFT == currentLooper)
-                {
-                    float lv = std::abs(knobValues[StereoLooper::LEFT][idx] - value);
-                    short ll = value > knobValues[StereoLooper::LEFT][idx] ? 1 - std::round(lv) : 2 + std::round(lv);
-                    mustPickUpLeft = lv > kMinPickupValueDelta;
-                    if (mustPickUpLeft)
-                    {
-                        hw.SetLed(ll, 0.f, 1.f, 0.f);
-                    }
-                    else
-                    {
-                        ProcessParameter(idx, value, StereoLooper::LEFT);
-                    }
-                }
-                // Handle parameter pick-up for the right looper.
-                if (StereoLooper::BOTH == currentLooper || StereoLooper::RIGHT == currentLooper)
-                {
-                    float rv = std::abs(knobValues[StereoLooper::RIGHT][idx] - value);
-                    short rl = value > knobValues[StereoLooper::RIGHT][idx] ? 1 - std::round(rv) : 2 + std::round(rv);
-                    mustPickUpRight = rv > kMinPickupValueDelta;
-                    if (mustPickUpRight)
-                    {
-                        hw.SetLed(rl, 1.f, 0.f, 0.f);
-                    }
-                    else
-                    {
-                        ProcessParameter(idx, value, StereoLooper::RIGHT);
-                    }
-                }
+                ProcessParameter(idx, value, StereoLooper::BOTH, false);
             }
+            // In dual mode, handle the parameter change picking up from the
+            // previous value.
             else
             {
-                ProcessParameter(idx, value, currentLooper);
+                editMode ? LedMeter(1.f, 7) : ClearLeds();
+
+                short led{};
+
+                // Handle parameter pick-up for the left channel.
+                if (StereoLooper::LEFT == currentChannel && editMode)
+                {
+                    float lv = std::abs(channelValues[StereoLooper::LEFT][idx] - value);
+                    led = value > channelValues[StereoLooper::LEFT][idx] ? 1 - std::round(lv) : 2 + std::round(lv);
+                    mustPickUpLeft = lv > kMinPickupValueDelta;
+                    if (!mustPickUpLeft)
+                    {
+                        ProcessParameter(idx, value, StereoLooper::LEFT, editMode);
+                    }
+                }
+                // Handle parameter pick-up for the right channel.
+                if (StereoLooper::RIGHT == currentChannel && editMode)
+                {
+                    float rv = std::abs(channelValues[StereoLooper::RIGHT][idx] - value);
+                    led = value > channelValues[StereoLooper::RIGHT][idx] ? 1 - std::round(rv) : 2 + std::round(rv);
+                    mustPickUpRight = rv > kMinPickupValueDelta;
+                    if (!mustPickUpRight)
+                    {
+                        ProcessParameter(idx, value, StereoLooper::RIGHT, editMode);
+                    }
+                }
+                // Show where and how far the previous values is.
+                if (mustPickUpLeft || mustPickUpRight)
+                {
+                    ClearLeds();
+                    hw.SetLed(led, 1.f, 1.f, 1.f);
+                }
             }
 
-            knobUpdates[idx] = value;
+            knobValues[idx] = value;
         }
     }
-
-    short buttonWorkflow{};
 
     inline void ProcessUi()
     {
@@ -275,33 +318,37 @@ namespace wreath
             // Init the parameters that, at this moment, can be safely set to
             // their respective knobs values (those not affected by the initial
             // buffering).
-            knobUpdates[DaisyVersio::KNOB_0] = knobs[DaisyVersio::KNOB_0].Process(); // Blend
-            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_0] = knobUpdates[DaisyVersio::KNOB_0];
-            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_0] = knobUpdates[DaisyVersio::KNOB_0];
-            ProcessParameter(DaisyVersio::KNOB_0, knobUpdates[DaisyVersio::KNOB_0], currentLooper);
-            knobUpdates[DaisyVersio::KNOB_2] = knobs[DaisyVersio::KNOB_2].Process(); // Tone
-            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_2] = knobUpdates[DaisyVersio::KNOB_2];
-            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_2] = knobUpdates[DaisyVersio::KNOB_2];
-            ProcessParameter(DaisyVersio::KNOB_2, knobUpdates[DaisyVersio::KNOB_2], currentLooper);
-            knobUpdates[DaisyVersio::KNOB_4] = knobs[DaisyVersio::KNOB_4].Process(); // Decay
-            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_4] = knobUpdates[DaisyVersio::KNOB_4];
-            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_4] = knobUpdates[DaisyVersio::KNOB_4];
-            ProcessParameter(DaisyVersio::KNOB_4, knobUpdates[DaisyVersio::KNOB_4], currentLooper);
-            knobUpdates[DaisyVersio::KNOB_5] = knobs[DaisyVersio::KNOB_5].Process(); // Rate
-            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_5] = knobUpdates[DaisyVersio::KNOB_5];
-            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_5] = knobUpdates[DaisyVersio::KNOB_5];
-            ProcessParameter(DaisyVersio::KNOB_5, knobUpdates[DaisyVersio::KNOB_5], currentLooper);
+            knobValues[DaisyVersio::KNOB_0] = knobs[DaisyVersio::KNOB_0].Process(); // Blend
+            channelValues[StereoLooper::LEFT][DaisyVersio::KNOB_0] = knobValues[DaisyVersio::KNOB_0];
+            channelValues[StereoLooper::RIGHT][DaisyVersio::KNOB_0] = knobValues[DaisyVersio::KNOB_0];
+            ProcessParameter(DaisyVersio::KNOB_0, knobValues[DaisyVersio::KNOB_0], currentChannel, false);
+            knobValues[DaisyVersio::KNOB_2] = knobs[DaisyVersio::KNOB_2].Process(); // Tone
+            channelValues[StereoLooper::LEFT][DaisyVersio::KNOB_2] = knobValues[DaisyVersio::KNOB_2];
+            channelValues[StereoLooper::RIGHT][DaisyVersio::KNOB_2] = knobValues[DaisyVersio::KNOB_2];
+            ProcessParameter(DaisyVersio::KNOB_2, knobValues[DaisyVersio::KNOB_2], currentChannel, false);
+            knobValues[DaisyVersio::KNOB_4] = knobs[DaisyVersio::KNOB_4].Process(); // Decay
+            channelValues[StereoLooper::LEFT][DaisyVersio::KNOB_4] = knobValues[DaisyVersio::KNOB_4];
+            channelValues[StereoLooper::RIGHT][DaisyVersio::KNOB_4] = knobValues[DaisyVersio::KNOB_4];
+            ProcessParameter(DaisyVersio::KNOB_4, knobValues[DaisyVersio::KNOB_4], currentChannel, false);
+            knobValues[DaisyVersio::KNOB_5] = knobs[DaisyVersio::KNOB_5].Process(); // Rate
+            channelValues[StereoLooper::LEFT][DaisyVersio::KNOB_5] = knobValues[DaisyVersio::KNOB_5];
+            channelValues[StereoLooper::RIGHT][DaisyVersio::KNOB_5] = knobValues[DaisyVersio::KNOB_5];
+            ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], currentChannel, false);
 
             // The others, just init the variables.
-            knobUpdates[DaisyVersio::KNOB_1] = knobs[DaisyVersio::KNOB_1].Process(); // Start
-            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_1] = knobUpdates[DaisyVersio::KNOB_1];
-            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_1] = knobUpdates[DaisyVersio::KNOB_1];
-            knobUpdates[DaisyVersio::KNOB_3] = knobs[DaisyVersio::KNOB_3].Process(); // Size
-            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_3] = knobUpdates[DaisyVersio::KNOB_3];
-            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_3] = knobUpdates[DaisyVersio::KNOB_3];
-            knobUpdates[DaisyVersio::KNOB_6] = knobs[DaisyVersio::KNOB_6].Process(); // Freeze
-            knobValues[StereoLooper::LEFT][DaisyVersio::KNOB_6] = knobUpdates[DaisyVersio::KNOB_6];
-            knobValues[StereoLooper::RIGHT][DaisyVersio::KNOB_6] = knobUpdates[DaisyVersio::KNOB_6];
+            knobValues[DaisyVersio::KNOB_1] = knobs[DaisyVersio::KNOB_1].Process(); // Start
+            channelValues[StereoLooper::LEFT][DaisyVersio::KNOB_1] = knobValues[DaisyVersio::KNOB_1];
+            channelValues[StereoLooper::RIGHT][DaisyVersio::KNOB_1] = knobValues[DaisyVersio::KNOB_1];
+            knobValues[DaisyVersio::KNOB_3] = knobs[DaisyVersio::KNOB_3].Process(); // Size
+            channelValues[StereoLooper::LEFT][DaisyVersio::KNOB_3] = knobValues[DaisyVersio::KNOB_3];
+            channelValues[StereoLooper::RIGHT][DaisyVersio::KNOB_3] = knobValues[DaisyVersio::KNOB_3];
+            knobValues[DaisyVersio::KNOB_6] = knobs[DaisyVersio::KNOB_6].Process(); // Freeze
+            channelValues[StereoLooper::LEFT][DaisyVersio::KNOB_6] = knobValues[DaisyVersio::KNOB_6];
+            channelValues[StereoLooper::RIGHT][DaisyVersio::KNOB_6] = knobValues[DaisyVersio::KNOB_6];
+
+            // Init the global parameters.
+            globalValues[DaisyVersio::KNOB_0] = 1.f; // Gain
+            ProcessParameter(DaisyVersio::KNOB_0, globalValues[DaisyVersio::KNOB_0], currentChannel, true);
         }
         else {
             HandleTriggerSwitch();
@@ -309,93 +356,65 @@ namespace wreath
             if (looper.IsBuffering())
             {
                 LedMeter(looper.GetBufferSamples(StereoLooper::LEFT) / static_cast<float>(kBufferSamples), 7);
-                if (hw.tap.RisingEdge() && !buttonWorkflow)
+                if (hw.tap.RisingEdge())
                 {
                     // Stop buffering.
-                    looper.mustStopBuffering = true;
                     ClearLeds();
-                    //buttonWorkflow++;
+                    looper.mustStopBuffering = true;
                 }
             }
             else
             {
-                HandleLooperSwitch();
+                HandleChannelSwitch();
 
                 // Handle button press.
-                if (hw.tap.RisingEdge() && !buttonWorkflow)
+                if (hw.tap.RisingEdge() && !buttonPressed)
                 {
-                    if (StereoLooper::BOTH == currentLooper)
+                    buttonPressed = true;
+                    if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
+                    {
+                        looper.dryLevel = 1.f;
+                        looper.mustRestartRead = true;
+                    }
+                    else
                     {
                         buttonHoldStartTime = ms;
                     }
-                    buttonWorkflow = 1;
                 }
 
                 // Handle button release.
-                else if (hw.tap.FallingEdge() && buttonWorkflow)
+                else if (hw.tap.FallingEdge() && buttonPressed)
                 {
-                    buttonWorkflow = 0;
-                    switch (clickOp)
+                    buttonPressed = false;
+                    if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
                     {
-                        case MenuClickOp::TRIGGER:
-                            if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
-                            {
-                                looper.dryLevel_ = 1.0f;
-                                looper.mustRestartRead = true;
-                            }
-                            else
-                            {
-                                looper.mustRestart = true;
-                            }
-                            break;
-                        case MenuClickOp::EDIT:
-                            clickOp = MenuClickOp::TRIGGER;
-                            break;
+                        looper.dryLevel = 0.f;
+                    }
+                    else if (ms - buttonHoldStartTime <= kMaxMsHoldForTrigger)
+                    {
+                        if (editMode)
+                        {
+                            EditMode(false);
+                        }
+                        else
+                        {
+                            looper.mustRestart = true;
+                        }
                     }
                 }
 
                 // Do something while the button is pressed.
-                if (buttonWorkflow)
+                if (buttonPressed)
                 {
-                    if (StereoLooper::BOTH == currentLooper)
+                    if (!editMode && ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
                     {
-                        if (StereoLooper::TriggerMode::GATE == looper.GetTriggerMode())
-                        {
-                            looper.dryLevel_ = 0.f;
-                        }
-                        // Handle button time held only when the trigger mode is not gate.
-                        else
-                        {
-                            size_t time = ms - buttonHoldStartTime;
-                            // Clear the buffer if the button has been held more than 2 sec.
-                            if (1 == buttonWorkflow && time >= 2000.f)
-                            {
-                                LedMeter(1.f, 2);
-                                buttonWorkflow++;
-                            }
-                            if (2 == buttonWorkflow && time >= 2350.f)
-                            {
-                                ClearLeds();
-                                looper.mustClearBuffer = true;
-                                buttonWorkflow++;
-                            }
-                            // Reset the looper if the button has been held more than 5 sec.
-                            if (3 == buttonWorkflow && time >= 5000.f)
-                            {
-                                LedMeter(1.f, 7);
-                                buttonWorkflow++;
-                            }
-                            if (4 == buttonWorkflow && time >= 5350.f)
-                            {
-                                ClearLeds();
-                                looper.mustResetLooper = true;
-                                buttonWorkflow = 0;
-                            }
-                        }
+                        EditMode(true);
+                        buttonPressed = false;
                     }
-                    else
+                    else if (editMode && ms - buttonHoldStartTime > 1000.f)
                     {
-                        clickOp = MenuClickOp::EDIT;
+                        ClearLeds();
+                        looper.mustResetLooper = true;
                     }
                 }
 
@@ -403,12 +422,12 @@ namespace wreath
                 {
                     if (hw.Gate())
                     {
-                        looper.dryLevel_ = 1.0f;
+                        looper.dryLevel = 1.0f;
                         //looper.mustRestartRead = true;
                         gateTriggered = true;
                     }
                     else if (gateTriggered) {
-                        looper.dryLevel_ = 0.f;
+                        looper.dryLevel = 0.f;
                         gateTriggered = false;
                     }
                 }
@@ -417,15 +436,15 @@ namespace wreath
                     looper.mustRestart = true;
                 }
 
-                ProcessKnob(DaisyVersio::KNOB_3, true); // Size
-                ProcessKnob(DaisyVersio::KNOB_1, true); // Start
-                ProcessKnob(DaisyVersio::KNOB_6, false); // Freeze
+                ProcessKnob(DaisyVersio::KNOB_3); // Size
+                ProcessKnob(DaisyVersio::KNOB_1); // Start
+                ProcessKnob(DaisyVersio::KNOB_6); // Freeze
             }
 
-            ProcessKnob(DaisyVersio::KNOB_0, false); // Blend
-            ProcessKnob(DaisyVersio::KNOB_2, false); // Tone
-            ProcessKnob(DaisyVersio::KNOB_4, false); // Decay
-            ProcessKnob(DaisyVersio::KNOB_5, true); // Rate
+            ProcessKnob(DaisyVersio::KNOB_0); // Blend
+            ProcessKnob(DaisyVersio::KNOB_2); // Tone
+            ProcessKnob(DaisyVersio::KNOB_4); // Decay
+            ProcessKnob(DaisyVersio::KNOB_5); // Rate
         }
     }
 
