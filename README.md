@@ -20,7 +20,7 @@ Versio: from Latin for “versatile”
 - Knob 6 > [rate]
 - Knob 7 > [freeze]
 - ABC > [channel]
-- XYZ > [flow]
+- XYZ > [play]
 - FSU > [trigger]
 
 **Blend:** Dry/wet balance control.
@@ -54,38 +54,49 @@ Versio: from Latin for “versatile”
 - center > both channels are controlled;
 - right > right channel.
 
-**Flow:** The bottom switch sets how the play is triggered:
+**Play mode:** The bottom switch sets how the play is triggered:
 - left > momentary, no restart, slowly accelerates/decelerates while changing the pitch;
 - center > one shot, restarts at loop start point;
 - right > continuously loops.
 
-**Trigger:** Gate or trigger depending on the Flow switch.
+**Play input:** Gate or trigger depending on the relative switch.
 
+## Buffering
 
-## Button operation:
+When the module starts the buffer is empty, and because of this no wet signal
+(the one read from the buffer) is present.
+The initial buffering can be stopped by pressing the button, this way the
+maximum loop length will be shorter than the total buffer length (150 seconds).
+Cleaning the buffer and restarting the buffering operation can be done in edit
+mode (see below) by pressing and holding the button for more than 1 second.
 
-- while starting up = ?
-- while buffering = rising edge stop buffering
-- in mono mode (channel switch in center position):
-    - while recording in loop mode:
-        - rising edge start hold timer
-        - falling edge if time < 500 ms = trigger looper restart
-        - while holding, global edit mode:
-            - blend knob = gain level
-            - tone knob = BP filter resonance (?)
-            - rate knob = rate slew time (?)
-            - freeze knob = at noon clears buffer, CW resets looper
-    - while recording in trigger mode:
-        - rising edge start hold timer
-        - falling edge if time < 500 ms = trigger looper restart
-        - while holding, global edit mode:
-            - blend knob = gain level
-            - tone knob = BP filter resonance (?)
-            - rate knob = rate slew time (?)
-            - freeze knob = at noon clears buffer, CW resets looper
-    - while recording in gate mode:
-        - rising edge = looper play on
-        - falling edge = looper play off
-- in dual mode (channel switch in either left or right position):
-    - trigger and gate as above, but in trigger mode:
-        - while holding, channel edit mode with pick-up
+## Triggering the looper
+
+When the looper is in either loop or trigger mode the rapid press of the button
+restarts the looper at the **start point**.
+In gate mode the looper plays while the button is pressed.
+The same behaviour applies when the module receives a positive voltage at the
+**play input**.
+
+## Edit mode
+
+Edit mode is entered by pressing and holding the button for more than 0.25
+seconds when the module is either in loop or in trigger mode.
+
+## Global options
+
+Global options are accessed in any mode keeping the button pressed for more than 0.25 seconds.
+In this scenario the knobs acts as follow:
+
+**Blend:** Input gain:
+- ccw > 0 (no input);
+- cw > 5x.
+
+**Tone:** Filter type:
+- ccw > low pass;
+- noon > band pass;
+- cw > high pass.
+
+**Decay:** Stereo image:
+- ccw > no image;
+- cw > full image.
