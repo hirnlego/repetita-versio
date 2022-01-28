@@ -73,6 +73,25 @@ namespace wreath
         }
     }
 
+    inline void AudioMeter(float leftIn, float rightIn, float leftOut, float rightOut)
+    {
+        if (!looper.IsBuffering() && Channel::GLOBAL != currentChannel)
+        {
+            static float inLeft{};
+            static float inRight{};
+            static float outLeft{};
+            static float outRight{};
+            fonepole(inLeft, std::abs(leftIn), 0.01f);
+            fonepole(inRight, std::abs(rightIn), 0.01f);
+            fonepole(outLeft, std::abs(leftOut), 0.01f);
+            fonepole(outRight, std::abs(rightOut), 0.01f);
+            hw.leds[DaisyVersio::LED_0].Set(inLeft, inLeft, inLeft);
+            hw.leds[DaisyVersio::LED_1].Set(inRight, inRight, inRight);
+            hw.leds[DaisyVersio::LED_2].Set(outLeft, outLeft, outLeft);
+            hw.leds[DaisyVersio::LED_3].Set(outRight, outRight, outRight);
+        }
+    }
+
     float Map(float value, float aMin, float aMax, float bMin, float bMax)
     {
         float k = std::abs(bMax - bMin) / std::abs(aMax - aMin) * (bMax > bMin ? 1 : -1);
@@ -80,7 +99,7 @@ namespace wreath
         return bMin + k * (value - aMin);
     }
 
-    void EditMode(bool active)
+    void GlobalMode(bool active)
     {
         if (active)
         {
@@ -108,10 +127,10 @@ namespace wreath
         // Quit edit mode when changing.
         if (Channel::GLOBAL == currentChannel)
         {
-            EditMode(false);
+            GlobalMode(false);
         }
 
-        currentChannel = static_cast<Channel>(value);
+        currentChannel = prevChannel = static_cast<Channel>(value);
     }
 
     // 0: center, 1: left, 2: right
@@ -129,6 +148,7 @@ namespace wreath
 
     inline void ProcessParameter(short idx, float value, Channel channel)
     {
+        // Keep track of parameters values only after startup.
         if (!looper.IsStartingUp())
         {
             if (Channel::GLOBAL == channel)
@@ -139,6 +159,9 @@ namespace wreath
                 channelValues[channel][idx] = value;
             }
         }
+
+        float leftValue{};
+        float rightValue{};
 
         switch (idx)
         {
@@ -157,7 +180,16 @@ namespace wreath
             case DaisyVersio::KNOB_1:
                 {
                     int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(channel) : looper.GetBufferSamples(Channel::LEFT);
-                    looper.SetLoopStart(channel, Map(value, 0.f, 1.f, 0.f, bufferSamples));
+                    if (Channel::BOTH == channel || Channel::LEFT == channel)
+                    {
+                        leftValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, channelValues[Channel::LEFT][idx] * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
+                        looper.SetLoopStart(Channel::LEFT, leftValue);
+                    }
+                    if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                    {
+                        rightValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, channelValues[Channel::RIGHT][idx] * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
+                        looper.SetLoopStart(Channel::RIGHT, rightValue);
+                    }
                 }
                 break;
             // Tone
@@ -217,14 +249,14 @@ namespace wreath
                     static bool noteModeLeft{};
                     if (noteModeLeft != looper.noteModeLeft)
                     {
-                        ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], Channel::LEFT);
+                        ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], currentChannel);
                     }
                     noteModeLeft = looper.noteModeLeft;
                     // Refresh the rate parameter if the note mode changes.
                     static bool noteModeRight{};
                     if (noteModeRight != looper.noteModeRight)
                     {
-                        ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], Channel::RIGHT);
+                        ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], currentChannel);
                     }
                     noteModeRight = looper.noteModeRight;
                 }
@@ -233,7 +265,8 @@ namespace wreath
             case DaisyVersio::KNOB_4:
                 if (Channel::GLOBAL == currentChannel)
                 {
-                    looper.stereoImage = value;
+                    // Full range would cause flipping the L and R channels at 0.
+                    looper.stereoImage = Map(value, 0.f, 1.f, 0.5f, 1.f);
                 }
                 else
                 {
@@ -242,36 +275,76 @@ namespace wreath
                 break;
             // Rate
             case DaisyVersio::KNOB_5:
-                if (looper.noteModeLeft && Channel::LEFT == channel)
+                if (Channel::BOTH == channel || Channel::LEFT == channel)
                 {
-                    // In "note" mode, the rate knob sets the pitch, with 5
-                    // octaves span.
-                    float n = Map(value, 0.f, 1.f, -48, 12);
-                    float rate = std::pow(2.f, n / 12);
-                    looper.SetReadRate(Channel::LEFT, rate);
-                }
-                else if (looper.noteModeRight && Channel::RIGHT == channel)
-                {
-                    // In "note" mode, the rate knob sets the pitch, with 5
-                    // octaves span.
-                    float n = Map(value, 0.f, 1.f, -48, 12);
-                    float rate = std::pow(2.f, n / 12);
-                    looper.SetReadRate(Channel::RIGHT, rate);
-                }
-                else
-                {
-                    if (value < 0.45f)
+                    if (looper.noteModeLeft)
                     {
-                        looper.SetReadRate(channel, Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f));
+                        // In "note" mode, the rate knob sets the pitch, with 5
+                        // octaves span.
+                        leftValue = Map(value, 0.f, 1.f, -48, 12);
+                        if (Channel::BOTH == channel)
+                        {
+                            leftValue = Map(value, 0.f, 1.f, -48, (channelValues[Channel::LEFT][idx] * 60) - 48);
+                        }
+                        float rate = std::pow(2.f, leftValue / 12);
+                        looper.SetReadRate(Channel::LEFT, rate);
                     }
-                    else if (value > 0.55f)
-                    {
-                        looper.SetReadRate(channel, Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult));
-                    }
-                    // Center dead zone.
                     else
                     {
-                        looper.SetReadRate(channel, 1.f);
+                        if (Channel::BOTH == channel)
+                        {
+                            leftValue = Map(value, 0.f, 1.f, kMinSpeedMult, channelValues[Channel::LEFT][idx] * kMaxSpeedMult);
+                        }
+                        else if (value < 0.45f)
+                        {
+                            leftValue = Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f);
+                        }
+                        else if (value > 0.55f)
+                        {
+                            leftValue = Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult);
+                        }
+                        // Center dead zone.
+                        else
+                        {
+                            leftValue = Map(value, 0.45f, 0.55f, 1.f, 1.f);
+                        }
+                        looper.SetReadRate(Channel::LEFT, leftValue);
+                    }
+                }
+                if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                {
+                    if (looper.noteModeRight)
+                    {
+                        // In "note" mode, the rate knob sets the pitch, with 5
+                        // octaves span.
+                        rightValue = Map(value, 0.f, 1.f, -48, 12);
+                        if (Channel::BOTH == channel)
+                        {
+                            rightValue = Map(value, 0.f, 1.f, -48, (channelValues[Channel::RIGHT][idx] * 60) - 48);
+                        }
+                        float rate = std::pow(2.f, rightValue / 12);
+                        looper.SetReadRate(Channel::RIGHT, rate);
+                    }
+                    else
+                    {
+                        if (Channel::BOTH == channel)
+                        {
+                            rightValue = Map(value, 0.f, 1.f, kMinSpeedMult, channelValues[Channel::RIGHT][idx] * kMaxSpeedMult);
+                        }
+                        else if (value < 0.45f)
+                        {
+                            rightValue = Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f);
+                        }
+                        else if (value > 0.55f)
+                        {
+                            rightValue = Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult);
+                        }
+                        // Center dead zone.
+                        else
+                        {
+                            rightValue = Map(value, 0.45f, 0.55f, 1.f, 1.f);
+                        }
+                        looper.SetReadRate(Channel::RIGHT, rightValue);
                     }
                 }
                 break;
@@ -313,8 +386,12 @@ namespace wreath
         }
     }
 
+    bool first{true};
+
     inline void ProcessUi()
     {
+        HandleTriggerSwitch();
+
         if (looper.IsStartingUp())
         {
             // Init the parameters that, at this moment, can be safely set to
@@ -341,9 +418,9 @@ namespace wreath
             knobValues[DaisyVersio::KNOB_1] = knobs[DaisyVersio::KNOB_1].Process(); // Start
             channelValues[Channel::LEFT][DaisyVersio::KNOB_1] = knobValues[DaisyVersio::KNOB_1];
             channelValues[Channel::RIGHT][DaisyVersio::KNOB_1] = knobValues[DaisyVersio::KNOB_1];
-            knobValues[DaisyVersio::KNOB_3] = knobs[DaisyVersio::KNOB_3].Process(); // Size
-            channelValues[Channel::LEFT][DaisyVersio::KNOB_3] = knobValues[DaisyVersio::KNOB_3];
-            channelValues[Channel::RIGHT][DaisyVersio::KNOB_3] = knobValues[DaisyVersio::KNOB_3];
+            //knobValues[DaisyVersio::KNOB_3] = knobs[DaisyVersio::KNOB_3].Process(); // Size
+            //channelValues[Channel::LEFT][DaisyVersio::KNOB_3] = knobValues[DaisyVersio::KNOB_3];
+            //channelValues[Channel::RIGHT][DaisyVersio::KNOB_3] = knobValues[DaisyVersio::KNOB_3];
             knobValues[DaisyVersio::KNOB_6] = knobs[DaisyVersio::KNOB_6].Process(); // Freeze
             channelValues[Channel::LEFT][DaisyVersio::KNOB_6] = knobValues[DaisyVersio::KNOB_6];
             channelValues[Channel::RIGHT][DaisyVersio::KNOB_6] = knobValues[DaisyVersio::KNOB_6];
@@ -353,8 +430,6 @@ namespace wreath
             ProcessParameter(DaisyVersio::KNOB_0, globalValues[DaisyVersio::KNOB_0], Channel::GLOBAL);
         }
         else {
-            HandleTriggerSwitch();
-
             if (looper.IsBuffering())
             {
                 LedMeter(looper.GetBufferSamples(Channel::LEFT) / static_cast<float>(kBufferSamples), 7);
@@ -367,6 +442,12 @@ namespace wreath
             }
             else
             {
+                if (first)
+                {
+                    // Turn off buffering leds.
+                    ClearLeds();
+                }
+
                 HandleChannelSwitch();
 
                 // Handle button press.
@@ -396,7 +477,7 @@ namespace wreath
                     {
                         if (Channel::GLOBAL == currentChannel)
                         {
-                            EditMode(false);
+                            GlobalMode(false);
                         }
                         else
                         {
@@ -410,12 +491,12 @@ namespace wreath
                 {
                     if (Channel::GLOBAL != currentChannel && ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
                     {
-                        EditMode(true);
+                        GlobalMode(true);
                         buttonPressed = false;
                     }
                     else if (Channel::GLOBAL == currentChannel && ms - buttonHoldStartTime > 1000.f)
                     {
-                        EditMode(false);
+                        GlobalMode(false);
                         buttonPressed = false;
                         looper.mustResetLooper = true;
                     }
@@ -434,7 +515,7 @@ namespace wreath
                         gateTriggered = false;
                     }
                 }
-                else if (hw.gate.Trig())
+                else if (hw.gate.Trig() && !first)
                 {
                     looper.mustRestart = true;
                 }
@@ -442,6 +523,8 @@ namespace wreath
                 ProcessKnob(DaisyVersio::KNOB_3); // Size
                 ProcessKnob(DaisyVersio::KNOB_1); // Start
                 ProcessKnob(DaisyVersio::KNOB_6); // Freeze
+
+                first = false;
             }
 
             ProcessKnob(DaisyVersio::KNOB_0); // Blend

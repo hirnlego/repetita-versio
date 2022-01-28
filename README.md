@@ -63,12 +63,15 @@ Versio: from Latin for “versatile”
 
 ## Buffering
 
-When the module starts the buffer is empty, and because of this no wet signal
-(the one read from the buffer) is present.
-The initial buffering can be stopped by pressing the button, this way the
-maximum loop length will be shorter than the total buffer length (150 seconds).
-Cleaning the buffer and restarting the buffering operation can be done in edit
-mode (see below) by pressing and holding the button for more than 1 second.
+As soon as the module starts the buffer is filled with the input signal. During
+the buffering process the leds gradually light up red to represent how much
+buffer is being written, with all 4 leds fully lit representing a full buffer.
+The maximum buffer length is 150 seconds, but if a shorter buffer is desired
+the process may be interrupted by pressing the button.
+Upon completion (or interruption) of the process the reproduction of the
+buffer's content begins.
+The buffer can be cleared and the process started again by pressing and holding
+the button for more than one second in edit mode (see below).
 
 ## Triggering the looper
 
@@ -97,6 +100,6 @@ In this scenario the knobs acts as follow:
 - noon > band pass;
 - cw > high pass.
 
-**Decay:** Stereo image:
-- ccw > no image;
-- cw > full image.
+**Decay:** Stereo amount:
+- ccw > mono;
+- cw > stereo.
