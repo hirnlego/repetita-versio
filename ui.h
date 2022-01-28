@@ -182,12 +182,12 @@ namespace wreath
                     int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(channel) : looper.GetBufferSamples(Channel::LEFT);
                     if (Channel::BOTH == channel || Channel::LEFT == channel)
                     {
-                        leftValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, channelValues[Channel::LEFT][idx] * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
+                        leftValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, (1.f - channelValues[Channel::LEFT][idx]) * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
                         looper.SetLoopStart(Channel::LEFT, leftValue);
                     }
                     if (Channel::BOTH == channel || Channel::RIGHT == channel)
                     {
-                        rightValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, channelValues[Channel::RIGHT][idx] * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
+                        rightValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, (1.f - channelValues[Channel::RIGHT][idx]) * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
                         looper.SetLoopStart(Channel::RIGHT, rightValue);
                     }
                 }
