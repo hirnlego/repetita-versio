@@ -180,6 +180,9 @@ namespace wreath
             case DaisyVersio::KNOB_1:
                 {
                     int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(channel) : looper.GetBufferSamples(Channel::LEFT);
+                    looper.SetLoopStart(Channel::BOTH, Map(value, 0.f, 1.f, 0.f, bufferSamples));
+                    /*
+                    int32_t bufferSamples = looper.IsDualMode() ? looper.GetBufferSamples(channel) : looper.GetBufferSamples(Channel::LEFT);
                     if (Channel::BOTH == channel || Channel::LEFT == channel)
                     {
                         leftValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, (1.f - channelValues[Channel::LEFT][idx]) * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
@@ -190,6 +193,7 @@ namespace wreath
                         rightValue = Channel::BOTH == channel ? Map(value, 0.f, 1.f, 0.f, (1.f - channelValues[Channel::RIGHT][idx]) * bufferSamples) : Map(value, 0.f, 1.f, 0.f, bufferSamples);
                         looper.SetLoopStart(Channel::RIGHT, rightValue);
                     }
+                    */
                 }
                 break;
             // Tone
