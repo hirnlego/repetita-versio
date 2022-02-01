@@ -275,76 +275,83 @@ namespace wreath
                 break;
             // Rate
             case DaisyVersio::KNOB_5:
-                if (Channel::BOTH == channel || Channel::LEFT == channel)
+                if (Channel::GLOBAL == currentChannel)
                 {
-                    if (looper.noteModeLeft)
-                    {
-                        // In "note" mode, the rate knob sets the pitch, with 5
-                        // octaves span.
-                        leftValue = Map(value, 0.f, 1.f, -48, 12);
-                        if (Channel::BOTH == channel)
-                        {
-                            leftValue = Map(value, 0.f, 1.f, -48, (channelValues[Channel::LEFT][idx] * 60) - 48);
-                        }
-                        float rate = std::pow(2.f, leftValue / 12);
-                        looper.SetReadRate(Channel::LEFT, rate);
-                    }
-                    else
-                    {
-                        if (Channel::BOTH == channel)
-                        {
-                            leftValue = Map(value, 0.f, 1.f, kMinSpeedMult, channelValues[Channel::LEFT][idx] * kMaxSpeedMult);
-                        }
-                        else if (value < 0.45f)
-                        {
-                            leftValue = Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f);
-                        }
-                        else if (value > 0.55f)
-                        {
-                            leftValue = Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult);
-                        }
-                        // Center dead zone.
-                        else
-                        {
-                            leftValue = Map(value, 0.45f, 0.55f, 1.f, 1.f);
-                        }
-                        looper.SetReadRate(Channel::LEFT, leftValue);
-                    }
+                    // TODO: Rate slew
                 }
-                if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                else
                 {
-                    if (looper.noteModeRight)
+                    if (Channel::BOTH == channel || Channel::LEFT == channel)
                     {
-                        // In "note" mode, the rate knob sets the pitch, with 5
-                        // octaves span.
-                        rightValue = Map(value, 0.f, 1.f, -48, 12);
-                        if (Channel::BOTH == channel)
+                        if (looper.noteModeLeft)
                         {
-                            rightValue = Map(value, 0.f, 1.f, -48, (channelValues[Channel::RIGHT][idx] * 60) - 48);
+                            // In "note" mode, the rate knob sets the pitch, with 5
+                            // octaves span.
+                            leftValue = Map(value, 0.f, 1.f, -48, 12);
+                            if (Channel::BOTH == channel)
+                            {
+                                leftValue = Map(value, 0.f, 1.f, -48, (channelValues[Channel::LEFT][idx] * 60) - 48);
+                            }
+                            float rate = std::pow(2.f, leftValue / 12);
+                            looper.SetReadRate(Channel::LEFT, rate);
                         }
-                        float rate = std::pow(2.f, rightValue / 12);
-                        looper.SetReadRate(Channel::RIGHT, rate);
-                    }
-                    else
-                    {
-                        if (Channel::BOTH == channel)
-                        {
-                            rightValue = Map(value, 0.f, 1.f, kMinSpeedMult, channelValues[Channel::RIGHT][idx] * kMaxSpeedMult);
-                        }
-                        else if (value < 0.45f)
-                        {
-                            rightValue = Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f);
-                        }
-                        else if (value > 0.55f)
-                        {
-                            rightValue = Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult);
-                        }
-                        // Center dead zone.
                         else
                         {
-                            rightValue = Map(value, 0.45f, 0.55f, 1.f, 1.f);
+                            if (Channel::BOTH == channel)
+                            {
+                                leftValue = Map(value, 0.f, 1.f, kMinSpeedMult, channelValues[Channel::LEFT][idx] * kMaxSpeedMult);
+                            }
+                            else if (value < 0.45f)
+                            {
+                                leftValue = Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f);
+                            }
+                            else if (value > 0.55f)
+                            {
+                                leftValue = Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult);
+                            }
+                            // Center dead zone.
+                            else
+                            {
+                                leftValue = Map(value, 0.45f, 0.55f, 1.f, 1.f);
+                            }
+                            looper.SetReadRate(Channel::LEFT, leftValue);
                         }
-                        looper.SetReadRate(Channel::RIGHT, rightValue);
+                    }
+                    if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                    {
+                        if (looper.noteModeRight)
+                        {
+                            // In "note" mode, the rate knob sets the pitch, with 5
+                            // octaves span.
+                            rightValue = Map(value, 0.f, 1.f, -48, 12);
+                            if (Channel::BOTH == channel)
+                            {
+                                rightValue = Map(value, 0.f, 1.f, -48, (channelValues[Channel::RIGHT][idx] * 60) - 48);
+                            }
+                            float rate = std::pow(2.f, rightValue / 12);
+                            looper.SetReadRate(Channel::RIGHT, rate);
+                        }
+                        else
+                        {
+                            if (Channel::BOTH == channel)
+                            {
+                                rightValue = Map(value, 0.f, 1.f, kMinSpeedMult, channelValues[Channel::RIGHT][idx] * kMaxSpeedMult);
+                            }
+                            else if (value < 0.45f)
+                            {
+                                rightValue = Map(value, 0.f, 0.45f, kMinSpeedMult, 1.f);
+                            }
+                            else if (value > 0.55f)
+                            {
+                                rightValue = Map(value, 0.55f, 1.f, 1.f, kMaxSpeedMult);
+                            }
+                            // Center dead zone.
+                            else
+                            {
+                                rightValue = Map(value, 0.45f, 0.55f, 1.f, 1.f);
+                            }
+                            looper.SetReadRate(Channel::RIGHT, rightValue);
+                        }
                     }
                 }
                 break;
