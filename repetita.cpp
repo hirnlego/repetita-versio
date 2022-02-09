@@ -19,7 +19,7 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
         float rightOut{};
         looper.Process(leftIn, rightIn, leftOut, rightOut);
 
-        AudioMeter(leftIn, rightIn, leftOut, rightOut);
+        //AudioMeter(leftIn, rightIn, leftOut, rightOut);
 
         OUT_L[i] = leftOut;
         OUT_R[i] = rightOut;
@@ -33,7 +33,7 @@ int main(void)
     StereoLooper::Conf conf
     {
         StereoLooper::Mode::MONO,
-        StereoLooper::TriggerMode::LOOP,
+        Looper::TriggerMode::LOOP,
         Movement::NORMAL,
         Direction::FORWARD,
         1.0f

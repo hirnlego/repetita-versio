@@ -38,13 +38,13 @@ namespace wreath
         EDIT,
     };
     ButtonOp buttonOp{ButtonOp::NORMAL};
-    StereoLooper::TriggerMode currentTriggerMode{};
+    Looper::TriggerMode currentTriggerMode{};
     bool buttonPressed{};
     bool gateTriggered{};
-    float knobChangeStartTime{};
     float buttonHoldStartTime{};
-    bool mustPickUpLeft{};
-    bool mustPickUpRight{};
+
+    bool startUp{true};
+    bool buffering{};
 
     inline void ClearLeds()
     {
@@ -144,7 +144,7 @@ namespace wreath
             return;
         }
 
-        currentTriggerMode = static_cast<StereoLooper::TriggerMode>(value);
+        currentTriggerMode = static_cast<Looper::TriggerMode>(value);
         looper.SetTriggerMode(currentTriggerMode);
     }
 
@@ -429,144 +429,162 @@ namespace wreath
         }
     }
 
-    bool startUp{true};
-    bool first{true};
-
     inline void ProcessUi()
     {
-        HandleTriggerSwitch();
-
-        if (!looper.IsStartingUp())
+        if (looper.IsStartingUp())
         {
-            if (looper.IsBuffering())
+            if (startUp)
             {
-                LedMeter(looper.GetBufferSamples(Channel::LEFT) / static_cast<float>(kBufferSamples), 7);
+                startUp = false;
 
-                // Stop buffering.
-                if (hw.tap.RisingEdge())
+                // Init the global parameters.
+                globalValues[DaisyVersio::KNOB_0] = 1 / kMaxGain; // Gain (1x)
+                ProcessParameter(DaisyVersio::KNOB_0, globalValues[DaisyVersio::KNOB_0], Channel::GLOBAL);
+                globalValues[DaisyVersio::KNOB_2] = 0.5f; // Filter type (BP)
+                ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
+                globalValues[DaisyVersio::KNOB_4] = 1.f; // Stereo image (full)
+                ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
+            }
+
+            return;
+        }
+
+        // The looper is buffering.
+        if (looper.IsBuffering())
+        {
+            buffering = true;
+            LedMeter(looper.GetBufferSamples(Channel::LEFT) / static_cast<float>(kBufferSamples), 7);
+
+            // Stop buffering.
+            if (hw.tap.RisingEdge())
+            {
+                ClearLeds();
+                looper.mustStopBuffering = true;
+            }
+
+            return;
+        }
+
+        bool first{true};
+
+        // The looper is ready, do some configuration before start.
+        if (looper.IsReady())
+        {
+            if (!first) return;
+            first = false;
+
+            currentTriggerMode = static_cast<Looper::TriggerMode>(hw.sw[DaisyVersio::SW_1].Read());
+            looper.SetTriggerMode(currentTriggerMode);
+
+            // Init all the parameters with the relative knobs position.
+            for (size_t i = 0; i < DaisyVersio::KNOB_LAST; i++)
+            {
+                knobValues[i] = knobs[i].Process();
+                if (knobValues[i] < kMinValueDelta)
                 {
-                    ClearLeds();
-                    looper.mustStopBuffering = true;
+                    knobValues[i] = 0.f;
                 }
+                else if (knobValues[i] > 1 - kMinValueDelta)
+                {
+                    knobValues[i] = 1.f;
+                }
+                for (short j = 2; j >= 0; j--)
+                {
+                    channelValues[j][i] = knobValues[i];
+                    ProcessParameter(i, knobValues[i], static_cast<Channel>(j));
+                }
+            }
+
+            looper.Start();
+
+            return;
+        }
+
+        // At this point the looper is running, do the normal UI loop.
+
+        //ClearLeds();
+        LedMeter(looper.GetReadPos(Channel::LEFT) / looper.GetBufferSamples(Channel::LEFT), 7);
+
+        HandleTriggerSwitch();
+        HandleChannelSwitch();
+
+        ProcessKnob(DaisyVersio::KNOB_3); // Size
+        ProcessKnob(DaisyVersio::KNOB_1); // Start
+        ProcessKnob(DaisyVersio::KNOB_6); // Freeze
+
+        ProcessKnob(DaisyVersio::KNOB_0); // Blend
+        ProcessKnob(DaisyVersio::KNOB_2); // Tone
+        ProcessKnob(DaisyVersio::KNOB_4); // Decay
+        ProcessKnob(DaisyVersio::KNOB_5); // Rate
+
+        // Handle button press.
+        if (hw.tap.RisingEdge() && !buttonPressed)
+        {
+            buttonPressed = true;
+            if (looper.IsGateMode())
+            {
+                looper.dryLevel = 1.f;
             }
             else
             {
-                if (first)
+                buttonHoldStartTime = ms;
+            }
+        }
+
+        // Handle button release.
+        if (hw.tap.FallingEdge() && buttonPressed)
+        {
+            buttonPressed = false;
+            if (looper.IsGateMode())
+            {
+                looper.dryLevel = 0.f;
+            }
+            else if (ms - buttonHoldStartTime <= kMaxMsHoldForTrigger)
+            {
+                if (Channel::GLOBAL == currentChannel)
                 {
-                    // Turn off buffering leds.
-                    ClearLeds();
-
-                    // Init all the parameters with the relative knobs position.
-                    for (size_t i = 0; i < DaisyVersio::KNOB_LAST; i++)
-                    {
-                        knobValues[i] = knobs[i].Process();
-                        if (knobValues[i] < kMinValueDelta)
-                        {
-                            knobValues[i] = 0.f;
-                        }
-                        else if (knobValues[i] > 1 - kMinValueDelta)
-                        {
-                            knobValues[i] = 1.f;
-                        }
-                        for (short j = 2; j >= 0; j--)
-                        {
-                            channelValues[j][i] = knobValues[i];
-                            ProcessParameter(i, knobValues[i], static_cast<Channel>(j));
-                        }
-                    }
-
-                    // Init the global parameters.
-                    globalValues[DaisyVersio::KNOB_0] = 1 / kMaxGain; // Gain (1x)
-                    ProcessParameter(DaisyVersio::KNOB_0, globalValues[DaisyVersio::KNOB_0], Channel::GLOBAL);
-                    globalValues[DaisyVersio::KNOB_2] = 0.5f; // Filter type (BP)
-                    ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
-                    globalValues[DaisyVersio::KNOB_4] = 1.f; // Stereo image (full)
-                    ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
+                    GlobalMode(false);
                 }
-
-                HandleChannelSwitch();
-
-                // Handle button press.
-                if (hw.tap.RisingEdge() && !buttonPressed)
+                else
                 {
-                    buttonPressed = true;
-                    if (looper.IsGateMode())
-                    {
-                        looper.dryLevel = 1.f;
-                        //looper.mustRestartRead = true;
-                    }
-                    else
-                    {
-                        buttonHoldStartTime = ms;
-                    }
-                }
-
-                // Handle button release.
-                else if (hw.tap.FallingEdge() && buttonPressed)
-                {
-                    buttonPressed = false;
-                    if (looper.IsGateMode())
-                    {
-                        looper.dryLevel = 0.f;
-                    }
-                    else if (ms - buttonHoldStartTime <= kMaxMsHoldForTrigger)
-                    {
-                        if (Channel::GLOBAL == currentChannel)
-                        {
-                            GlobalMode(false);
-                        }
-                        else
-                        {
-                            looper.mustRestart = true;
-                        }
-                    }
-                }
-
-                // Do something while the button is pressed.
-                if (buttonPressed && !looper.IsGateMode())
-                {
-                    if (Channel::GLOBAL != currentChannel && ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
-                    {
-                        GlobalMode(true);
-                        buttonPressed = false;
-                    }
-                    else if (Channel::GLOBAL == currentChannel && ms - buttonHoldStartTime > 1000.f)
-                    {
-                        GlobalMode(false);
-                        buttonPressed = false;
-                        looper.mustResetLooper = true;
-                    }
-                }
-
-                if (looper.IsGateMode())
-                {
-                    if (hw.Gate())
-                    {
-                        looper.dryLevel = 1.0f;
-                        //looper.mustRestartRead = true;
-                        gateTriggered = true;
-                    }
-                    else if (gateTriggered) {
-                        looper.dryLevel = 0.f;
-                        gateTriggered = false;
-                    }
-                }
-                else if (hw.gate.Trig() && !first)
-                {
+                    LedMeter(0.25f, 7);
                     looper.mustRestart = true;
                 }
-
-                ProcessKnob(DaisyVersio::KNOB_3); // Size
-                ProcessKnob(DaisyVersio::KNOB_1); // Start
-                ProcessKnob(DaisyVersio::KNOB_6); // Freeze
-
-                first = false;
             }
+        }
 
-            ProcessKnob(DaisyVersio::KNOB_0); // Blend
-            ProcessKnob(DaisyVersio::KNOB_2); // Tone
-            ProcessKnob(DaisyVersio::KNOB_4); // Decay
-            ProcessKnob(DaisyVersio::KNOB_5); // Rate
+        // Do something while the button is pressed.
+        if (buttonPressed && !looper.IsGateMode())
+        {
+            if (Channel::GLOBAL != currentChannel && ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
+            {
+                GlobalMode(true);
+                buttonPressed = false;
+            }
+            else if (Channel::GLOBAL == currentChannel && ms - buttonHoldStartTime > 1000.f)
+            {
+                GlobalMode(false);
+                buttonPressed = false;
+                looper.mustResetLooper = true;
+            }
+        }
+
+        if (looper.IsGateMode())
+        {
+            if (hw.Gate())
+            {
+                looper.dryLevel = 1.0f;
+                gateTriggered = true;
+            }
+            else if (gateTriggered) {
+                looper.dryLevel = 0.f;
+                gateTriggered = false;
+            }
+        }
+        else if (hw.gate.Trig())
+        {
+            LedMeter(0.25f, 7);
+            looper.mustRestart = true;
         }
     }
 
@@ -580,7 +598,5 @@ namespace wreath
         colors[DaisyVersio::KNOB_5].Init(1.f, 0.5f, 0.f); // Orange
         colors[DaisyVersio::KNOB_6].Init(0.5f, 0.5f, 1.f); // Light blue
         colors[7].Init(1.f, 0.f, 0.f); // Red
-
-        looper.SetDirection(Channel::BOTH, Direction::FORWARD);
     }
 }
