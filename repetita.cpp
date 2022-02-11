@@ -36,7 +36,7 @@ int main(void)
         Looper::TriggerMode::LOOP,
         Movement::NORMAL,
         Direction::FORWARD,
-        1.0f
+        rate: 1.0f
     };
 
     looper.Init(hw.AudioSampleRate(), conf);

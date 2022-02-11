@@ -41,7 +41,7 @@ namespace wreath
     Looper::TriggerMode currentTriggerMode{};
     bool buttonPressed{};
     bool gateTriggered{};
-    float buttonHoldStartTime{};
+    int32_t buttonHoldStartTime{};
 
     bool startUp{true};
     bool buffering{};
@@ -182,27 +182,34 @@ namespace wreath
             case DaisyVersio::KNOB_0:
                 if (Channel::GLOBAL == channel)
                 {
-                    looper.gain = value * kMaxGain;
+                    looper.inputGain = value * kMaxGain;
                 }
                 else
                 {
-                    looper.mix = value;
+                    looper.dryWetMix = value;
                 }
                 break;
             // Start
             case DaisyVersio::KNOB_1:
                 {
-                    if (Channel::BOTH == channel || Channel::LEFT == channel)
+                    if (Channel::GLOBAL == channel)
                     {
-                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, kMinSpeedMult, kMaxSpeedMult) : value;
-                        leftValue = Map(v, 0.f, 1.f, 0.f, looper.GetBufferSamples(Channel::LEFT));
-                        looper.SetLoopStart(Channel::LEFT, leftValue);
+
                     }
-                    if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                    else
                     {
-                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, kMinSpeedMult, kMaxSpeedMult) : value;
-                        rightValue = Map(v, 0.f, 1.f, 0.f, looper.GetBufferSamples(Channel::RIGHT));
-                        looper.SetLoopStart(Channel::RIGHT, rightValue);
+                        if (Channel::BOTH == channel || Channel::LEFT == channel)
+                        {
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
+                            leftValue = Map(v, 0.f, 1.f, 0.f, looper.GetBufferSamples(Channel::LEFT) - 1);
+                            looper.SetLoopStart(Channel::LEFT, leftValue);
+                        }
+                        if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                        {
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
+                            rightValue = Map(v, 0.f, 1.f, 0.f, looper.GetBufferSamples(Channel::RIGHT) - 1);
+                            looper.SetLoopStart(Channel::RIGHT, rightValue);
+                        }
                     }
                 }
                 break;
@@ -231,80 +238,99 @@ namespace wreath
             // Size
             case DaisyVersio::KNOB_3:
                 {
-                    if (Channel::BOTH == channel || Channel::LEFT == channel)
+                    if (Channel::GLOBAL == channel)
                     {
-                        float v = (Channel::BOTH == channel) ? value + deltaLeft : value;
-
-                        // Backwards, from buffer's length to 50ms.
-                        if (v <= 0.35f)
-                        {
-                            looper.SetLoopLength(Channel::LEFT, Map(v, 0.f, 0.35f, looper.GetBufferSamples(Channel::LEFT), kMinSamplesForTone));
-                            looper.SetDirection(Channel::LEFT, Direction::BACKWARDS);
-                        }
-                        // Backwards, from 50ms to 1ms (grains).
-                        else if (v < 0.5f)
-                        {
-                            looper.SetLoopLength(Channel::LEFT, Map(v, 0.35f, 0.5f, kMinSamplesForTone, kMinLoopLengthSamples));
-                            looper.SetDirection(Channel::LEFT, Direction::BACKWARDS);
-                        }
-                        // Forward, from 1ms to 50ms (grains).
-                        else if (v >= 0.5f && v < 0.65f)
-                        {
-                            looper.SetLoopLength(Channel::LEFT, Map(v, 0.5f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
-                            looper.SetDirection(Channel::LEFT, Direction::FORWARD);
-                        }
-                        // Forward, from 50ms to buffer's length.
-                        else if (v >= 0.65f)
-                        {
-                            looper.SetLoopLength(Channel::LEFT, Map(v, 0.65f, 1.f, kMinSamplesForTone, looper.GetBufferSamples(Channel::LEFT)));
-                            looper.SetDirection(Channel::LEFT, Direction::FORWARD);
-                        }
-
-                        // Refresh the rate parameter if the note mode changed.
-                        static bool noteModeLeft{};
-                        if (noteModeLeft != looper.noteModeLeft)
-                        {
-                            ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], Channel::LEFT);
-                        }
-                        noteModeLeft = looper.noteModeLeft;
+                        looper.SetSamplesToFade(Map(value, 0.f, 1.f, 0.f, kMaxSamplesToFade));
                     }
-
-                    if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                    else
                     {
-                        float v = (Channel::BOTH == channel) ? value + deltaRight : value;
+                        if (Channel::BOTH == channel || Channel::LEFT == channel)
+                        {
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
 
-                        // Backwards, from buffer's length to 50ms.
-                        if (v <= 0.35f)
-                        {
-                            looper.SetLoopLength(Channel::RIGHT, Map(v, 0.f, 0.35f, looper.GetBufferSamples(Channel::RIGHT), kMinSamplesForTone));
-                            looper.SetDirection(Channel::RIGHT, Direction::BACKWARDS);
-                        }
-                        // Backwards, from 50ms to 1ms (grains).
-                        else if (v < 0.5f)
-                        {
-                            looper.SetLoopLength(Channel::RIGHT, Map(v, 0.35f, 0.5f, kMinSamplesForTone, kMinLoopLengthSamples));
-                            looper.SetDirection(Channel::RIGHT, Direction::BACKWARDS);
-                        }
-                        // Forward, from 1ms to 50ms (grains).
-                        else if (v >= 0.5f && v < 0.65f)
-                        {
-                            looper.SetLoopLength(Channel::RIGHT, Map(v, 0.5f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
-                            looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
-                        }
-                        // Forward, from 50ms to buffer's length.
-                        else if (v >= 0.65f)
-                        {
-                            looper.SetLoopLength(Channel::RIGHT, Map(v, 0.65f, 1.f, kMinSamplesForTone, looper.GetBufferSamples(Channel::RIGHT)));
-                            looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
+                            // Backwards, from buffer's length to 50ms.
+                            if (v <= 0.35f)
+                            {
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.f, 0.35f, looper.GetBufferSamples(Channel::LEFT), kMinSamplesForTone));
+                                looper.SetDirection(Channel::LEFT, Direction::BACKWARDS);
+                            }
+                            // Backwards, from 50ms to 1ms (grains).
+                            else if (v < 0.45f)
+                            {
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.35f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
+                                looper.SetDirection(Channel::LEFT, Direction::BACKWARDS);
+                            }
+                            // Forward, from 1ms to 50ms (grains).
+                            else if (v >= 0.55f && v < 0.65f)
+                            {
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.55f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
+                                looper.SetDirection(Channel::LEFT, Direction::FORWARD);
+                            }
+                            // Forward, from 50ms to buffer's length.
+                            else if (v >= 0.65f)
+                            {
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.65f, 1.f, kMinSamplesForTone, looper.GetBufferSamples(Channel::LEFT)));
+                                looper.SetDirection(Channel::LEFT, Direction::FORWARD);
+                            }
+                            // Center dead zone.
+                            else
+                            {
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.45f, 0.55f, kMinLoopLengthSamples, kMinLoopLengthSamples));
+                                looper.SetDirection(Channel::LEFT, Direction::FORWARD);
+                            }
+
+                            // Refresh the rate parameter if the note mode changed.
+                            static bool noteModeLeft{};
+                            if (noteModeLeft != looper.noteModeLeft)
+                            {
+                                ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], Channel::LEFT);
+                            }
+                            noteModeLeft = looper.noteModeLeft;
                         }
 
-                        // Refresh the rate parameter if the note mode changed.
-                        static bool noteModeRight{};
-                        if (noteModeRight != looper.noteModeRight)
+                        if (Channel::BOTH == channel || Channel::RIGHT == channel)
                         {
-                            ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], Channel::RIGHT);
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
+
+                            // Backwards, from buffer's length to 50ms.
+                            if (v <= 0.35f)
+                            {
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.f, 0.35f, looper.GetBufferSamples(Channel::RIGHT), kMinSamplesForTone));
+                                looper.SetDirection(Channel::RIGHT, Direction::BACKWARDS);
+                            }
+                            // Backwards, from 50ms to 1ms (grains).
+                            else if (v < 0.45f)
+                            {
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.35f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
+                                looper.SetDirection(Channel::RIGHT, Direction::BACKWARDS);
+                            }
+                            // Forward, from 1ms to 50ms (grains).
+                            else if (v >= 0.55f && v < 0.65f)
+                            {
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.55f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
+                                looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
+                            }
+                            // Forward, from 50ms to buffer's length.
+                            else if (v >= 0.65f)
+                            {
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.65f, 1.f, kMinSamplesForTone, looper.GetBufferSamples(Channel::RIGHT)));
+                                looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
+                            }
+                            // Center dead zone.
+                            else
+                            {
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.45f, 0.55f, kMinLoopLengthSamples, kMinLoopLengthSamples));
+                                looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
+                            }
+
+                            // Refresh the rate parameter if the note mode changed.
+                            static bool noteModeRight{};
+                            if (noteModeRight != looper.noteModeRight)
+                            {
+                                ProcessParameter(DaisyVersio::KNOB_5, knobValues[DaisyVersio::KNOB_5], Channel::RIGHT);
+                            }
+                            noteModeRight = looper.noteModeRight;
                         }
-                        noteModeRight = looper.noteModeRight;
                     }
                 }
                 break;
@@ -324,19 +350,19 @@ namespace wreath
             case DaisyVersio::KNOB_5:
                 if (Channel::GLOBAL == channel)
                 {
-                    looper.rateSlew = Map(value, 0.f, 1.f, 1.f, 0.0001f);
+                    looper.rateSlew = Map(value, 0.f, 1.f, 0.f, 2.f);
                 }
                 else
                 {
                     if (Channel::BOTH == channel || Channel::LEFT == channel)
                     {
-                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, kMinSpeedMult, kMaxSpeedMult) : value;
+                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
 
                         if (looper.noteModeLeft)
                         {
                             // In "note" mode, the rate knob sets the pitch, with 5
                             // octaves span.
-                            leftValue = Map(v, 0.f, 1.f, -24, 24);
+                            leftValue = std::floor(Map(v, 0.f, 1.f, -24, 24));
                             float rate = std::pow(2.f, leftValue / 12);
                             looper.SetReadRate(Channel::LEFT, rate);
                         }
@@ -361,13 +387,13 @@ namespace wreath
 
                     if (Channel::BOTH == channel || Channel::RIGHT == channel)
                     {
-                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, kMinSpeedMult, kMaxSpeedMult) : value;
+                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
 
                         if (looper.noteModeRight)
                         {
                             // In "note" mode, the rate knob sets the pitch, with 5
                             // octaves span.
-                            rightValue = Map(v, 0.f, 1.f, -24, 24);
+                            rightValue = std::floor(Map(v, 0.f, 1.f, -24, 24));
                             float rate = std::pow(2.f, rightValue / 12);
                             looper.SetReadRate(Channel::RIGHT, rate);
                         }
@@ -395,10 +421,20 @@ namespace wreath
             case DaisyVersio::KNOB_6:
                 if (Channel::GLOBAL == channel)
                 {
+                    looper.outputGain = value * kMaxGain;
                 }
                 else
                 {
-                    looper.SetFreeze(value);
+                    if (Channel::BOTH == channel || Channel::LEFT == channel)
+                    {
+                        float leftValue = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
+                        looper.SetFreeze(Channel::LEFT, leftValue);
+                    }
+                    if (Channel::BOTH == channel || Channel::RIGHT == channel)
+                    {
+                        float rightValue = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
+                        looper.SetFreeze(Channel::RIGHT, rightValue);
+                    }
                 }
                 break;
 
@@ -437,13 +473,25 @@ namespace wreath
             {
                 startUp = false;
 
+                // Init the dry/wet mix parameter.
+                knobValues[DaisyVersio::KNOB_0] = knobs[DaisyVersio::KNOB_0].Process();
+                ProcessParameter(DaisyVersio::KNOB_0, knobValues[DaisyVersio::KNOB_0], Channel::BOTH);
+
                 // Init the global parameters.
-                globalValues[DaisyVersio::KNOB_0] = 1 / kMaxGain; // Gain (1x)
+                globalValues[DaisyVersio::KNOB_0] = 1.f / kMaxGain; // Input gain (1x)
                 ProcessParameter(DaisyVersio::KNOB_0, globalValues[DaisyVersio::KNOB_0], Channel::GLOBAL);
+                globalValues[DaisyVersio::KNOB_1] = 0.f; // Channels offset (0)
+                ProcessParameter(DaisyVersio::KNOB_1, globalValues[DaisyVersio::KNOB_1], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_2] = 0.5f; // Filter type (BP)
                 ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
+                globalValues[DaisyVersio::KNOB_3] = kSamplesToFade * (1.f / kMaxSamplesToFade); // Samples to fade (1200)
+                ProcessParameter(DaisyVersio::KNOB_3, globalValues[DaisyVersio::KNOB_3], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_4] = 1.f; // Stereo image (full)
                 ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
+                globalValues[DaisyVersio::KNOB_5] = 0.f; // Rate slew (0)
+                ProcessParameter(DaisyVersio::KNOB_5, globalValues[DaisyVersio::KNOB_5], Channel::GLOBAL);
+                globalValues[DaisyVersio::KNOB_6] = 1.f / kMaxGain; // Output gain (1x)
+                ProcessParameter(DaisyVersio::KNOB_6, globalValues[DaisyVersio::KNOB_6], Channel::GLOBAL);
             }
 
             return;
@@ -465,13 +513,14 @@ namespace wreath
             return;
         }
 
-        bool first{true};
-
         // The looper is ready, do some configuration before start.
         if (looper.IsReady())
         {
-            if (!first) return;
-            first = false;
+            if (!buffering)
+            {
+                return;
+            }
+            buffering = false;
 
             currentTriggerMode = static_cast<Looper::TriggerMode>(hw.sw[DaisyVersio::SW_1].Read());
             looper.SetTriggerMode(currentTriggerMode);
@@ -502,8 +551,8 @@ namespace wreath
 
         // At this point the looper is running, do the normal UI loop.
 
-        //ClearLeds();
-        LedMeter(looper.GetReadPos(Channel::LEFT) / looper.GetBufferSamples(Channel::LEFT), 7);
+        ClearLeds();
+        //LedMeter(looper.GetReadPos(Channel::LEFT) / looper.GetLoopLength(Channel::LEFT), 7);
 
         HandleTriggerSwitch();
         HandleChannelSwitch();
@@ -569,6 +618,7 @@ namespace wreath
             }
         }
 
+        static bool first{true};
         if (looper.IsGateMode())
         {
             if (hw.Gate())
@@ -581,11 +631,13 @@ namespace wreath
                 gateTriggered = false;
             }
         }
-        else if (hw.gate.Trig())
+        else if (hw.gate.Trig() && !first)
         {
             LedMeter(0.25f, 7);
             looper.mustRestart = true;
         }
+
+        first = false;
     }
 
     inline void InitUi()
