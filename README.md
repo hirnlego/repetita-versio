@@ -8,7 +8,7 @@ Repetita: from Latin Repetere for “repeat” (as in Repetita Iuvant, meaning �
 
 Versio: from Latin for “versatile”
 
-“Versatile repetitor”
+“Versatile repeater”
 
 ## Controls
 
@@ -27,7 +27,7 @@ Versio: from Latin for “versatile”
 
 **Start:** Sets the loop starting/retriggering point.
 
-**Tone:** Applies a band-pass resonant filter to the dry signal, pre-recording:
+**Tone:** Applies a resonant filter to both the dry signal - that is mixed with the feedback - and the wet signals - that goes to the output:
 - ccw > no filter;
 - cw > cutoff at 1000 Hz.
 
@@ -40,10 +40,11 @@ Versio: from Latin for “versatile”
 - ccw > instant decay;
 - cw > no decay.
 
-**Rate:** The rate of reproduction of the buffer. In note mode, controls the transposition (from -4 octaves to +1 octave):
+**Rate:** The rate of reproduction of the buffer. In note mode, controls the 
+transposition (from -2 octaves to +2 octave):
 - ccw > slowest rate (0.2x);
 - noon > normal rate (1x);
-- cw > fastes rate (4x).
+- cw > fastest rate (4x).
 
 **Freeze:** Progressively freezes the buffer:
 - ccw > completely un-frozen (recording);
@@ -116,9 +117,9 @@ Global options are accessed in any mode keeping the button pressed for more than
 - ccw > 0 (no slew);
 - cw > 10.
 
-**Freeze:** Overdub:
-- ccw > off (delay mode);
-- cw > on (looper mode).
+**Freeze:** Locks the read and write loop lengths:
+- ccw > off (looper mode);
+- cw > on (delay mode).
 
 ## Leds
 
@@ -140,13 +141,13 @@ mode.
 
 ## Exploration notes
 
-### As a looper (overdub on - default)
+### As a looper (loop sync on - default)
 
-### As a delay (overdub off)
+### As a delay (loop sync off)
 
-When the overdub option is off (**Freeze** knob ccw of noon in global mode), a
-relatively short buffer (or loop) length, the looper acts as a delay, where the
-time is given by the length itself:
+When the loop sync option is off (**Freeze** knob ccw of noon in global mode), 
+with a relatively short buffer (or loop) length the looper acts as a delay, where 
+the time is given by the length itself:
 
 - **Size:** when fully cw the delay time is at its longest (the full recorded
     buffer), lowering it allows to reach a slap-back type of delay. Lower values
@@ -156,9 +157,9 @@ time is given by the length itself:
 - **Decay:** controls the delay feedback amount, the higher the value the smeared
     is the wet signal. Noon is a good amount to let the delay tail fade slowly;
 
-### Comb filter zone (overdub off)
+### Comb filter zone (loop sync off)
 
-Also when overdub is off, When the loop length is really short (< 10ms) the
+Also when loop sync is off, if the loop length is really short (< 10ms) the
 looper acts as a comb filter:
 
 - **Size:** between approximately 1 and 2 o'clock the loop length is
@@ -181,10 +182,10 @@ less than 1ms). When in this position, the looper act as a wavetable oscillator
 of sorts, and it can be played with an acceptably good tracking along 4 octaves:
 
 - **Rate:** at noon it should produce a C4 (?), fully ccw is 2 octaves below,
-    fully cw is two octaves above. The relative CV input should track decently;
+    fully cw is 2 octaves above. The relative CV input should track decently;
 - **Freeze:** when fully frozen, the played sound fragment is fixed and thus the
     produced sound is clear and defined. Let some of the unfrozen sound pass
-    through to get a dirtier sound;
+    through to get a dirtier tone;
 - **Start:** the timbre of the produced sound can be altered by changing the
     loop's starting point. If the sound's volume is too low, try moving this
     knob to find a stronger fragment.
@@ -192,5 +193,5 @@ of sorts, and it can be played with an acceptably good tracking along 4 octaves:
 ### Self oscillation
 
 The looper can be used also when no inputs are connected. Just jump-start it by
-placing the **Start** knob at noon and the **Decay** knob fully cw. From there
-it's just a matter of maintaining the initial sound an play with it as always.
+placing the **Start** knob at noon and the **Decay** knob fully cw. From here
+it's just a matter of feeding the initial sound an play with the looper.

@@ -447,7 +447,7 @@ namespace wreath
                 if (Channel::GLOBAL == channel)
                 {
                     //looper.outputGain = value * kMaxGain;
-                    looper.SetOverdub(value >= 0.5);
+                    looper.SetLoopSync(value >= 0.5);
                 }
                 else
                 {
@@ -517,7 +517,7 @@ namespace wreath
                 globalValues[DaisyVersio::KNOB_5] = 0.f; // Rate slew (0)
                 ProcessParameter(DaisyVersio::KNOB_5, globalValues[DaisyVersio::KNOB_5], Channel::GLOBAL);
                 //globalValues[DaisyVersio::KNOB_6] = 1.f / kMaxGain; // Output gain (1x)
-                globalValues[DaisyVersio::KNOB_6] = 1.f; // Overdub (on)
+                globalValues[DaisyVersio::KNOB_6] = 0.f; // Loop sync (off)
                 ProcessParameter(DaisyVersio::KNOB_6, globalValues[DaisyVersio::KNOB_6], Channel::GLOBAL);
             }
 
