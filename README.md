@@ -157,18 +157,17 @@ the time is given by the length itself:
 - **Decay:** controls the delay feedback amount, the higher the value the smeared
     is the wet signal. Noon is a good amount to let the delay tail fade slowly;
 
-### Comb filter zone (loop sync off)
+### Comb filter zone (loop sync off)
 
 Also when loop sync is off, if the loop length is really short (< 10ms) the
 looper acts as a comb filter:
 
 - **Size:** between approximately 1 and 2 o'clock the loop length is
-    sufficiently short to allow the production of a comb filter-like sound,
+    sufficiently short to allow the generation of a comb filter-like sound,
     especially with **Decay** dialed high. Going ccw past noon produced a
     different and grittier result, given that the looper is going backwards.
     Interesting results can be achieved when reaching the lower boundary between
-    approximately 10 and 11 o'clock, just before the loop gets too long and
-    disperse;
+    approximately 10 and 11 o'clock, just before the loop gets long again;
 - **Decay:** the higher the amount, the more prominent is the effect;
 - **Rate:** dialing the right amount can produce a flanged sound, otherwise it
     easier for the wet signal to get destroyed: at higher amounts the sound gets
