@@ -82,15 +82,11 @@ In gate mode the looper plays while the button is pressed.
 The same behaviour applies when the module receives a positive voltage at the
 **play input**.
 
-## Edit mode
-
-Edit mode is entered by pressing and holding the button for more than 0.25
-seconds when the module is either in loop or in trigger mode.
-
 ## Global mode
 
 Global options are accessed in any mode keeping the button pressed for more than
-0.25 seconds. In this scenario the knobs acts as follow:
+0.3 seconds. When in global mode the leds lit-up with a light blue, icy color. 
+In this mode the knobs acts as follow:
 
 **Blend:** Input gain:
 - ccw > 0 (no input);
