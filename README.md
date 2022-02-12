@@ -86,20 +86,111 @@ The same behaviour applies when the module receives a positive voltage at the
 Edit mode is entered by pressing and holding the button for more than 0.25
 seconds when the module is either in loop or in trigger mode.
 
-## Global options
+## Global mode
 
-Global options are accessed in any mode keeping the button pressed for more than 0.25 seconds.
-In this scenario the knobs acts as follow:
+Global options are accessed in any mode keeping the button pressed for more than
+0.25 seconds. In this scenario the knobs acts as follow:
 
 **Blend:** Input gain:
 - ccw > 0 (no input);
 - cw > 5x.
+
+**Start:** Offset of the right looper's read head from the left's:
+- ccw > 0 (no offset);
+- cw > right loop length (maximum offset).
 
 **Tone:** Filter type:
 - ccw > low pass;
 - noon > band pass;
 - cw > high pass.
 
-**Decay:** Stereo amount:
+**Start:** Length of the crossfade (in samples):
+- ccw > 0;
+- cw > 4800.
+
+**Decay:** Stereo width:
 - ccw > mono;
 - cw > stereo.
+
+**Rate:** Rate slew (in seconds):
+- ccw > 0 (no slew);
+- cw > 10.
+
+**Freeze:** Overdub:
+- ccw > off (delay mode);
+- cw > on (looper mode).
+
+## Leds
+
+The 4 leds visualize different information depending of the context.
+
+During buffering, the leds light up gradually with a red color while the buffer
+fills. When the 4 leds are all lit with a bright red color the buffer has been
+completely wrote. During the normal operation, the leds light up gradually
+indicating the read head's position of the longest of the two channels. Their
+color depends on the **Size** knob's position:
+
+- light yellow when full cw;
+- green when at noon;
+- dark purple when full ccw.
+
+When one of the two channels is selected, the 4 leds split in two groups, one
+for the left channel and one for the right. The above colors apply also in this
+mode.
+
+## Exploration notes
+
+### As a looper (overdub on - default)
+
+### As a delay (overdub off)
+
+When the overdub option is off (**Freeze** knob ccw of noon in global mode), a
+relatively short buffer (or loop) length, the looper acts as a delay, where the
+time is given by the length itself:
+
+- **Size:** when fully cw the delay time is at its longest (the full recorded
+    buffer), lowering it allows to reach a slap-back type of delay. Lower values
+    send the looper in chorus territory. The delayed sound may be reverted by
+    moving the knob ccw past noon;
+- **Blend:** blends dry and delayed (wet) signals;
+- **Decay:** controls the delay feedback amount, the higher the value the smeared
+    is the wet signal. Noon is a good amount to let the delay tail fade slowly;
+
+### Comb filter zone (overdub off)
+
+Also when overdub is off, When the loop length is really short (< 10ms) the
+looper acts as a comb filter:
+
+- **Size:** between approximately 1 and 2 o'clock the loop length is
+    sufficiently short to allow the production of a comb filter-like sound,
+    especially with **Decay** dialed high. Going ccw past noon produced a
+    different and grittier result, given that the looper is going backwards.
+    Interesting results can be achieved when reaching the lower boundary between
+    approximately 10 and 11 o'clock, just before the loop gets too long and
+    disperse;
+- **Decay:** the higher the amount, the more prominent is the effect;
+- **Rate:** dialing the right amount can produce a flanged sound, otherwise it
+    easier for the wet signal to get destroyed: at higher amounts the sound gets
+    progressively more electric and fizzy, while going ccw past noon it gets
+    crackling and then disappears.
+
+### As an oscillator (of sorts)
+
+When the **Size** knob is at noon the loop length is at its shortest (a little
+less than 1ms). When in this position, the looper act as a wavetable oscillator
+of sorts, and it can be played with an acceptably good tracking along 4 octaves:
+
+- **Rate:** at noon it should produce a C4 (?), fully ccw is 2 octaves below,
+    fully cw is two octaves above. The relative CV input should track decently;
+- **Freeze:** when fully frozen, the played sound fragment is fixed and thus the
+    produced sound is clear and defined. Let some of the unfrozen sound pass
+    through to get a dirtier sound;
+- **Start:** the timbre of the produced sound can be altered by changing the
+    loop's starting point. If the sound's volume is too low, try moving this
+    knob to find a stronger fragment.
+
+### Self oscillation
+
+The looper can be used also when no inputs are connected. Just jump-start it by
+placing the **Start** knob at noon and the **Decay** knob fully cw. From there
+it's just a matter of maintaining the initial sound an play with it as always.

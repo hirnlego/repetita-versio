@@ -11,9 +11,10 @@ namespace wreath
     using namespace daisy;
     using namespace daisysp;
 
-    constexpr float kMaxMsHoldForTrigger{250.f};
+    constexpr float kMaxMsHoldForTrigger{300.f};
     constexpr float kMaxGain{5.f};
     constexpr float kMaxFilterValue{2000.f};
+    constexpr float kMaxRateSlew{10.f};
 
     enum Channel
     {
@@ -28,7 +29,21 @@ namespace wreath
     float channelValues[3][7]{};
     float knobValues[7]{};
     float globalValues[7]{};
-    Color colors[7];
+
+    enum ColorName
+    {
+        COLOR_RED,
+        COLOR_YELLOW,
+        COLOR_PURPLE,
+        COLOR_GREEN,
+        COLOR_ICE,
+        COLOR_ORANGE,
+        COLOR_BLUE,
+        COLOR_MAGENTA,
+        COLOR_LAST
+    };
+    Color colors[ColorName::COLOR_LAST];
+    ColorName channelColor[2]{ColorName::COLOR_ORANGE, ColorName::COLOR_ORANGE};
 
     enum class ButtonOp
     {
@@ -54,14 +69,15 @@ namespace wreath
         }
     }
 
-    inline void LedMeter(float value, short colorIdx)
+    inline void LedMeter(float value, short colorIdx, short length = 4, short offset = 0)
     {
-        short idx = static_cast<short>(std::floor(value * 4));
-        for (short i = 0; i <= DaisyVersio::LED_LAST; i++)
+        value = fclamp(value, 0.f, 1.f);
+        short idx = offset + static_cast<short>(std::floor(value * length));
+        for (short i = offset; i <= length + 1; i++)
         {
             if (i <= idx)
             {
-                float factor = ((i == idx) ? (value * 4 - idx) : 1.f);
+                float factor = ((i == idx) ? (value * length - idx) : 1.f);
                 if (factor < kMinValueDelta)
                 {
                     factor = 0.f;
@@ -107,7 +123,7 @@ namespace wreath
         {
             prevChannel = currentChannel;
             currentChannel = Channel::GLOBAL;
-            LedMeter(1.f, 7);
+            LedMeter(1.f, ColorName::COLOR_ICE);
         }
         else
         {
@@ -194,7 +210,7 @@ namespace wreath
                 {
                     if (Channel::GLOBAL == channel)
                     {
-
+                        looper.OffsetLoopers(Map(value, 0.f, 1.f, 0.f, looper.GetLoopLength(Channel::RIGHT)));
                     }
                     else
                     {
@@ -253,30 +269,35 @@ namespace wreath
                             {
                                 looper.SetLoopLength(Channel::LEFT, Map(v, 0.f, 0.35f, looper.GetBufferSamples(Channel::LEFT), kMinSamplesForTone));
                                 looper.SetDirection(Channel::LEFT, Direction::BACKWARDS);
+                                channelColor[Channel::LEFT] = ColorName::COLOR_PURPLE;
                             }
                             // Backwards, from 50ms to 1ms (grains).
-                            else if (v < 0.45f)
+                            else if (v < 0.47f)
                             {
-                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.35f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.35f, 0.47f, kMinSamplesForTone, kMinLoopLengthSamples));
                                 looper.SetDirection(Channel::LEFT, Direction::BACKWARDS);
+                                channelColor[Channel::LEFT] = ColorName::COLOR_BLUE;
                             }
                             // Forward, from 1ms to 50ms (grains).
-                            else if (v >= 0.55f && v < 0.65f)
+                            else if (v >= 0.53f && v < 0.65f)
                             {
-                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.55f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.53f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
                                 looper.SetDirection(Channel::LEFT, Direction::FORWARD);
+                                channelColor[Channel::LEFT] = ColorName::COLOR_YELLOW;
                             }
                             // Forward, from 50ms to buffer's length.
                             else if (v >= 0.65f)
                             {
                                 looper.SetLoopLength(Channel::LEFT, Map(v, 0.65f, 1.f, kMinSamplesForTone, looper.GetBufferSamples(Channel::LEFT)));
                                 looper.SetDirection(Channel::LEFT, Direction::FORWARD);
+                                channelColor[Channel::LEFT] = ColorName::COLOR_ORANGE;
                             }
                             // Center dead zone.
                             else
                             {
-                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.45f, 0.55f, kMinLoopLengthSamples, kMinLoopLengthSamples));
+                                looper.SetLoopLength(Channel::LEFT, Map(v, 0.47f, 0.53f, kMinLoopLengthSamples, kMinLoopLengthSamples));
                                 looper.SetDirection(Channel::LEFT, Direction::FORWARD);
+                                channelColor[Channel::LEFT] = ColorName::COLOR_GREEN;
                             }
 
                             // Refresh the rate parameter if the note mode changed.
@@ -297,30 +318,35 @@ namespace wreath
                             {
                                 looper.SetLoopLength(Channel::RIGHT, Map(v, 0.f, 0.35f, looper.GetBufferSamples(Channel::RIGHT), kMinSamplesForTone));
                                 looper.SetDirection(Channel::RIGHT, Direction::BACKWARDS);
+                                channelColor[Channel::RIGHT] = ColorName::COLOR_PURPLE;
                             }
                             // Backwards, from 50ms to 1ms (grains).
-                            else if (v < 0.45f)
+                            else if (v < 0.47f)
                             {
-                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.35f, 0.45f, kMinSamplesForTone, kMinLoopLengthSamples));
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.35f, 0.47f, kMinSamplesForTone, kMinLoopLengthSamples));
                                 looper.SetDirection(Channel::RIGHT, Direction::BACKWARDS);
+                                channelColor[Channel::RIGHT] = ColorName::COLOR_BLUE;
                             }
                             // Forward, from 1ms to 50ms (grains).
-                            else if (v >= 0.55f && v < 0.65f)
+                            else if (v >= 0.53f && v < 0.65f)
                             {
-                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.55f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.53f, 0.65f, kMinLoopLengthSamples, kMinSamplesForTone));
                                 looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
+                                channelColor[Channel::RIGHT] = ColorName::COLOR_YELLOW;
                             }
                             // Forward, from 50ms to buffer's length.
                             else if (v >= 0.65f)
                             {
                                 looper.SetLoopLength(Channel::RIGHT, Map(v, 0.65f, 1.f, kMinSamplesForTone, looper.GetBufferSamples(Channel::RIGHT)));
                                 looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
+                                channelColor[Channel::RIGHT] = ColorName::COLOR_ORANGE;
                             }
                             // Center dead zone.
                             else
                             {
-                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.45f, 0.55f, kMinLoopLengthSamples, kMinLoopLengthSamples));
+                                looper.SetLoopLength(Channel::RIGHT, Map(v, 0.47f, 0.53f, kMinLoopLengthSamples, kMinLoopLengthSamples));
                                 looper.SetDirection(Channel::RIGHT, Direction::FORWARD);
+                                channelColor[Channel::RIGHT] = ColorName::COLOR_GREEN;
                             }
 
                             // Refresh the rate parameter if the note mode changed.
@@ -338,8 +364,7 @@ namespace wreath
             case DaisyVersio::KNOB_4:
                 if (Channel::GLOBAL == channel)
                 {
-                    // Full range would cause flipping the L and R channels at 0.
-                    looper.stereoImage = Map(value, 0.f, 1.f, 0.5f, 1.f);
+                    looper.stereoWidth = Map(value, 0.f, 1.f, 0.f, 1.f);
                 }
                 else
                 {
@@ -350,7 +375,7 @@ namespace wreath
             case DaisyVersio::KNOB_5:
                 if (Channel::GLOBAL == channel)
                 {
-                    looper.rateSlew = Map(value, 0.f, 1.f, 0.f, 2.f);
+                    looper.rateSlew = Map(value, 0.f, 1.f, 0.f, kMaxRateSlew);
                 }
                 else
                 {
@@ -360,9 +385,9 @@ namespace wreath
 
                         if (looper.noteModeLeft)
                         {
-                            // In "note" mode, the rate knob sets the pitch, with 5
+                            // In "note" mode, the rate knob sets the pitch, with 4
                             // octaves span.
-                            leftValue = std::floor(Map(v, 0.f, 1.f, -24, 24));
+                            leftValue = std::floor(Map(v, 0.f, 1.f, -24, 24)) - 24;
                             float rate = std::pow(2.f, leftValue / 12);
                             looper.SetReadRate(Channel::LEFT, rate);
                         }
@@ -391,9 +416,9 @@ namespace wreath
 
                         if (looper.noteModeRight)
                         {
-                            // In "note" mode, the rate knob sets the pitch, with 5
+                            // In "note" mode, the rate knob sets the pitch, with 4
                             // octaves span.
-                            rightValue = std::floor(Map(v, 0.f, 1.f, -24, 24));
+                            rightValue = std::floor(Map(v, 0.f, 1.f, -24, 24)) - 24;
                             float rate = std::pow(2.f, rightValue / 12);
                             looper.SetReadRate(Channel::RIGHT, rate);
                         }
@@ -421,7 +446,8 @@ namespace wreath
             case DaisyVersio::KNOB_6:
                 if (Channel::GLOBAL == channel)
                 {
-                    looper.outputGain = value * kMaxGain;
+                    //looper.outputGain = value * kMaxGain;
+                    looper.SetOverdub(value >= 0.5);
                 }
                 else
                 {
@@ -486,11 +512,12 @@ namespace wreath
                 ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_3] = kSamplesToFade * (1.f / kMaxSamplesToFade); // Samples to fade (1200)
                 ProcessParameter(DaisyVersio::KNOB_3, globalValues[DaisyVersio::KNOB_3], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_4] = 1.f; // Stereo image (full)
+                globalValues[DaisyVersio::KNOB_4] = 1.f; // Stereo image (normal)
                 ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_5] = 0.f; // Rate slew (0)
                 ProcessParameter(DaisyVersio::KNOB_5, globalValues[DaisyVersio::KNOB_5], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_6] = 1.f / kMaxGain; // Output gain (1x)
+                //globalValues[DaisyVersio::KNOB_6] = 1.f / kMaxGain; // Output gain (1x)
+                globalValues[DaisyVersio::KNOB_6] = 1.f; // Overdub (on)
                 ProcessParameter(DaisyVersio::KNOB_6, globalValues[DaisyVersio::KNOB_6], Channel::GLOBAL);
             }
 
@@ -501,7 +528,7 @@ namespace wreath
         if (looper.IsBuffering())
         {
             buffering = true;
-            LedMeter(looper.GetBufferSamples(Channel::LEFT) / static_cast<float>(kBufferSamples), 7);
+            LedMeter(looper.GetBufferSamples(Channel::LEFT) / static_cast<float>(kBufferSamples), ColorName::COLOR_RED);
 
             // Stop buffering.
             if (hw.tap.RisingEdge())
@@ -551,8 +578,24 @@ namespace wreath
 
         // At this point the looper is running, do the normal UI loop.
 
-        ClearLeds();
-        //LedMeter(looper.GetReadPos(Channel::LEFT) / looper.GetLoopLength(Channel::LEFT), 7);
+        if (Channel::BOTH == currentChannel)
+        {
+            Channel max = (looper.GetLoopLength(Channel::LEFT) >= looper.GetLoopLength(Channel::RIGHT)) ? Channel::LEFT : Channel::RIGHT;
+            // Show the loop position of the longest channel.
+            if (looper.GetOverdub())
+            {
+                LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
+            }
+            else
+            {
+                LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), channelColor[max]);
+            }
+        }
+        else if (Channel::GLOBAL != currentChannel)
+        {
+            // Show the loop position of the current channel.
+            LedMeter(looper.GetReadPos(currentChannel) / looper.GetLoopLength(currentChannel), channelColor[currentChannel]);
+        }
 
         HandleTriggerSwitch();
         HandleChannelSwitch();
@@ -596,7 +639,7 @@ namespace wreath
                 }
                 else
                 {
-                    LedMeter(0.25f, 7);
+                    LedMeter(1.f, ColorName::COLOR_MAGENTA);
                     looper.mustRestart = true;
                 }
             }
@@ -633,7 +676,7 @@ namespace wreath
         }
         else if (hw.gate.Trig() && !first)
         {
-            LedMeter(0.25f, 7);
+            LedMeter(1.f, ColorName::COLOR_MAGENTA);
             looper.mustRestart = true;
         }
 
@@ -642,13 +685,13 @@ namespace wreath
 
     inline void InitUi()
     {
-        colors[DaisyVersio::KNOB_0].Init(0.5f, 0.f, 1.f); // Purple
-        colors[DaisyVersio::KNOB_1].Init(0.f, 1.f, 0.5f); // Green
-        colors[DaisyVersio::KNOB_2].Init(0.f, 0.f, 1.f); // Blue
-        colors[DaisyVersio::KNOB_3].Init(1.f, 0.8f, 0.5f); // Yellow
-        colors[DaisyVersio::KNOB_4].Init(1.f, 0.f, 1.f); // Magenta
-        colors[DaisyVersio::KNOB_5].Init(1.f, 0.5f, 0.f); // Orange
-        colors[DaisyVersio::KNOB_6].Init(0.5f, 0.5f, 1.f); // Light blue
-        colors[7].Init(1.f, 0.f, 0.f); // Red
+        colors[ColorName::COLOR_RED].Init(1.f, 0.f, 0.f); // Red (buffering)
+        colors[ColorName::COLOR_YELLOW].Init(1.f, 0.8f, 0.5f); // Yellow (size 2 o'clock)
+        colors[ColorName::COLOR_PURPLE].Init(0.5f, 0.f, 1.f); // Purple (size ccw)
+        colors[ColorName::COLOR_GREEN].Init(0.f, 1.f, 0.5f); // Green (size noon)
+        colors[ColorName::COLOR_ICE].Init(0.5f, 0.5f, 1.f); // Ice (global mode)
+        colors[ColorName::COLOR_ORANGE].Init(1.f, 0.5f, 0.f); // Orange (size cw)
+        colors[ColorName::COLOR_BLUE].Init(0.f, 0.f, 1.f); // Blue (size 10 o'clock)
+        colors[ColorName::COLOR_MAGENTA].Init(1.f, 0.f, 1.f); // Magenta (trigger/gate)
     }
 }
