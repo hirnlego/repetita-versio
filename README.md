@@ -8,7 +8,7 @@ Repetita: from Latin Repetere for “repeat” (as in Repetita Iuvant, meaning �
 
 Versio: from Latin for “versatile”
 
-“Versatile repetitor”
+“Versatile repeater”
 
 ## Controls
 
@@ -24,28 +24,37 @@ Versio: from Latin for “versatile”
 - FSU > [trigger]
 
 **Blend:** Dry/wet balance control.
+- ccw > fully dry;
+- cw > fully wet.
 
-**Start:** Sets the loop starting/retriggering point.
+**Start:** Sets the loop starting/retriggering point. The loop wraps around at
+the end of the buffer, so its size doesn't change when the start point moves:
+- ccw > begin of the buffer;
+- cw > end of the buffer.
 
-**Tone:** Applies a band-pass resonant filter to the dry signal, pre-recording:
+**Tone:** Applies a resonant filter to the feedback path. The default type is
+band-pass, but it can be changed to low-pass or high-pass in global mode (see
+below). When the looper is frozen some of this filtered signal is mixed with
+the wet signal that goes directly to the output:
 - ccw > no filter;
-- cw > cutoff at 1000 Hz.
+- cw > cutoff at 1500 Hz.
 
 **Size:** Changes the loop size:
-- ccw > full loop length but reversed, goes backwards;
+- ccw > full loop size but playback is reversed;
 - noon > note mode;
-- cw > full loop length, goes forward.
+- cw > full loop size, forward playback.
 
 **Decay:** Controls the level of decay of the recorded signal:
 - ccw > instant decay;
 - cw > no decay.
 
-**Rate:** The rate of reproduction of the buffer. In note mode, controls the transposition (from -4 octaves to +1 octave):
+**Rate:** The rate of playback of the buffer. In note mode, controls the
+transposition (from -2 octaves to +2 octave):
 - ccw > slowest rate (0.2x);
 - noon > normal rate (1x);
-- cw > fastes rate (4x).
+- cw > fastest rate (4x).
 
-**Freeze:** Progressively freezes the buffer:
+**Freeze:** Progressively mix from un-frozen to frozen buffer:
 - ccw > completely un-frozen (recording);
 - cw > completely frozen (no recording).
 
@@ -81,15 +90,11 @@ In gate mode the looper plays while the button is pressed.
 The same behaviour applies when the module receives a positive voltage at the
 **play input**.
 
-## Edit mode
-
-Edit mode is entered by pressing and holding the button for more than 0.25
-seconds when the module is either in loop or in trigger mode.
-
 ## Global mode
 
 Global options are accessed in any mode keeping the button pressed for more than
-0.25 seconds. In this scenario the knobs acts as follow:
+0.3 seconds. When in global mode the leds lit-up with a light blue, icy color.
+In this mode the knobs acts as follow:
 
 **Blend:** Input gain (default: unity):
 - ccw > 0 (no input);
@@ -140,34 +145,34 @@ mode.
 
 ## Exploration notes
 
-### As a looper (overdub on - default)
+### Delay mode off (default)
 
-### As a delay (overdub off)
+In the default mode the read and write loops are not synchronized and the module
+acts as a looper, where any changes applied to the parameters is written in the
+buffer.
 
-When the overdub option is off (**Freeze** knob ccw of noon in global mode), a
-relatively short buffer (or loop) length, the looper acts as a delay, where the
-time is given by the length itself:
+### Delay mode
+
+In this mode, activated by turning cw past noon the **Size** knob in the global
+mode, the read and write loops are synchronized and the module acts as a delay,
+where the time is given by the loop size.
 
 - **Size:** when fully cw the delay time is at its longest (the full recorded
     buffer), lowering it allows to reach a slap-back type of delay. Lower values
     send the looper in chorus territory. The delayed sound may be reverted by
-    moving the knob ccw past noon;
-- **Blend:** blends dry and delayed (wet) signals;
-- **Decay:** controls the delay feedback amount, the higher the value the smeared
-    is the wet signal. Noon is a good amount to let the delay tail fade slowly;
+    moving the knob ccw past noon.
 
-### Comb filter zone (overdub off)
+### Comb filter zone (delay mode)
 
-Also when overdub is off, When the loop length is really short (< 10ms) the
+Also when loop sync is off, if the loop size is really short (< 10ms) the
 looper acts as a comb filter:
 
-- **Size:** between approximately 1 and 2 o'clock the loop length is
-    sufficiently short to allow the production of a comb filter-like sound,
+- **Size:** between approximately 1 and 2 o'clock the loop size is
+    sufficiently short to allow the generation of a comb filter-like sound,
     especially with **Decay** dialed high. Going ccw past noon produced a
     different and grittier result, given that the looper is going backwards.
     Interesting results can be achieved when reaching the lower boundary between
-    approximately 10 and 11 o'clock, just before the loop gets too long and
-    disperse;
+    approximately 10 and 11 o'clock, just before the loop gets long again;
 - **Decay:** the higher the amount, the more prominent is the effect;
 - **Rate:** dialing the right amount can produce a flanged sound, otherwise it
     easier for the wet signal to get destroyed: at higher amounts the sound gets
@@ -176,15 +181,15 @@ looper acts as a comb filter:
 
 ### As an oscillator (of sorts)
 
-When the **Size** knob is at noon the loop length is at its shortest (a little
+When the **Size** knob is at noon the loop size is at its shortest (a little
 less than 1ms). When in this position, the looper act as a wavetable oscillator
 of sorts, and it can be played with an acceptably good tracking along 4 octaves:
 
 - **Rate:** at noon it should produce a C4 (?), fully ccw is 2 octaves below,
-    fully cw is two octaves above. The relative CV input should track decently;
+    fully cw is 2 octaves above. The relative CV input should track decently;
 - **Freeze:** when fully frozen, the played sound fragment is fixed and thus the
     produced sound is clear and defined. Let some of the unfrozen sound pass
-    through to get a dirtier sound;
+    through to get a dirtier tone;
 - **Start:** the timbre of the produced sound can be altered by changing the
     loop's starting point. If the sound's volume is too low, try moving this
     knob to find a stronger fragment.
@@ -192,5 +197,5 @@ of sorts, and it can be played with an acceptably good tracking along 4 octaves:
 ### Self oscillation
 
 The looper can be used also when no inputs are connected. Just jump-start it by
-placing the **Start** knob at noon and the **Decay** knob fully cw. From there
-it's just a matter of maintaining the initial sound an play with it as always.
+placing the **Start** knob at noon and the **Decay** knob fully cw. From here
+it's just a matter of feeding the initial sound an play with the looper.
