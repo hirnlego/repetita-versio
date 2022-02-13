@@ -91,34 +91,34 @@ seconds when the module is either in loop or in trigger mode.
 Global options are accessed in any mode keeping the button pressed for more than
 0.25 seconds. In this scenario the knobs acts as follow:
 
-**Blend:** Input gain:
+**Blend:** Input gain (default: unity):
 - ccw > 0 (no input);
 - cw > 5x.
 
 **Start:** Offset of the right looper's read head from the left's:
-- ccw > 0 (no offset);
+- ccw > 0 (no offset, default);
 - cw > right loop length (maximum offset).
 
 **Tone:** Filter type:
 - ccw > low pass;
-- noon > band pass;
+- noon > band pass (default);
 - cw > high pass.
 
-**Start:** Length of the crossfade (in samples):
-- ccw > 0;
-- cw > 4800.
+**Start:** Delay mode:
+- ccw > off (looper mode, default);
+- cw > on.
 
-**Decay:** Stereo width:
-- ccw > mono;
-- cw > stereo.
+**Decay:** Feedback level:
+- ccw > 0 (no feedback is written in the looper);
+- cw > unity (all feedback is written in the looper).
 
 **Rate:** Rate slew (in seconds):
-- ccw > 0 (no slew);
+- ccw > 0 (no slew, default);
 - cw > 10.
 
-**Freeze:** Overdub:
-- ccw > off (delay mode);
-- cw > on (looper mode).
+**Freeze:** Stereo width:
+- ccw > mono;
+- cw > stereo (default).
 
 ## Leds
 

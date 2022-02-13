@@ -13,7 +13,7 @@ namespace wreath
 
     constexpr float kMaxMsHoldForTrigger{300.f};
     constexpr float kMaxGain{5.f};
-    constexpr float kMaxFilterValue{2000.f};
+    constexpr float kMaxFilterValue{1500.f};
     constexpr float kMaxRateSlew{10.f};
 
     enum Channel
@@ -256,7 +256,8 @@ namespace wreath
                 {
                     if (Channel::GLOBAL == channel)
                     {
-                        looper.SetSamplesToFade(Map(value, 0.f, 1.f, 0.f, kMaxSamplesToFade));
+                        //looper.SetSamplesToFade(Map(value, 0.f, 1.f, 0.f, kMaxSamplesToFade));
+                        looper.SetLoopSync(value >= 0.5);
                     }
                     else
                     {
@@ -364,7 +365,7 @@ namespace wreath
             case DaisyVersio::KNOB_4:
                 if (Channel::GLOBAL == channel)
                 {
-                    looper.stereoWidth = Map(value, 0.f, 1.f, 0.f, 1.f);
+                    looper.feedbackLevel = value;
                 }
                 else
                 {
@@ -446,8 +447,7 @@ namespace wreath
             case DaisyVersio::KNOB_6:
                 if (Channel::GLOBAL == channel)
                 {
-                    //looper.outputGain = value * kMaxGain;
-                    looper.SetOverdub(value >= 0.5);
+                    looper.stereoWidth = Map(value, 0.f, 1.f, 0.f, 1.f);
                 }
                 else
                 {
@@ -504,20 +504,19 @@ namespace wreath
                 ProcessParameter(DaisyVersio::KNOB_0, knobValues[DaisyVersio::KNOB_0], Channel::BOTH);
 
                 // Init the global parameters.
-                globalValues[DaisyVersio::KNOB_0] = 1.f / kMaxGain; // Input gain (1x)
+                globalValues[DaisyVersio::KNOB_0] = 1.f / kMaxGain; // Input gain (unity)
                 ProcessParameter(DaisyVersio::KNOB_0, globalValues[DaisyVersio::KNOB_0], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_1] = 0.f; // Channels offset (0)
                 ProcessParameter(DaisyVersio::KNOB_1, globalValues[DaisyVersio::KNOB_1], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_2] = 0.5f; // Filter type (BP)
                 ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_3] = kSamplesToFade * (1.f / kMaxSamplesToFade); // Samples to fade (1200)
+                globalValues[DaisyVersio::KNOB_3] = 0.f; // Loop sync (off)
                 ProcessParameter(DaisyVersio::KNOB_3, globalValues[DaisyVersio::KNOB_3], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_4] = 1.f; // Stereo image (normal)
+                globalValues[DaisyVersio::KNOB_4] = 1.f; // Feedback level (unity)
                 ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_5] = 0.f; // Rate slew (0)
                 ProcessParameter(DaisyVersio::KNOB_5, globalValues[DaisyVersio::KNOB_5], Channel::GLOBAL);
-                //globalValues[DaisyVersio::KNOB_6] = 1.f / kMaxGain; // Output gain (1x)
-                globalValues[DaisyVersio::KNOB_6] = 1.f; // Overdub (on)
+                globalValues[DaisyVersio::KNOB_6] = 1.f; // Stereo image (normal)
                 ProcessParameter(DaisyVersio::KNOB_6, globalValues[DaisyVersio::KNOB_6], Channel::GLOBAL);
             }
 
@@ -582,13 +581,15 @@ namespace wreath
         {
             Channel max = (looper.GetLoopLength(Channel::LEFT) >= looper.GetLoopLength(Channel::RIGHT)) ? Channel::LEFT : Channel::RIGHT;
             // Show the loop position of the longest channel.
-            if (looper.GetOverdub())
-            {
-                LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
-            }
-            else
+            // Delay mode.
+            if (looper.HasLoopSync())
             {
                 LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), channelColor[max]);
+            }
+            // Looper mode.
+            else
+            {
+                LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
             }
         }
         else if (Channel::GLOBAL != currentChannel)
