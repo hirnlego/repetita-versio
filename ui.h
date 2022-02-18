@@ -27,6 +27,7 @@ namespace wreath
     Channel currentChannel{Channel::BOTH};
 
     float channelValues[3][7]{};
+    float deltaValues[2][7]{};
     float knobValues[7]{};
     float globalValues[7]{};
 
@@ -181,15 +182,13 @@ namespace wreath
         float leftValue{};
         float rightValue{};
 
-        static float deltaLeft{};
-        static float deltaRight{};
         if (Channel::LEFT == channel)
         {
-            deltaLeft = value - channelValues[Channel::BOTH][idx];
+            deltaValues[Channel::LEFT][idx] = value - channelValues[Channel::BOTH][idx];
         }
         else if (Channel::RIGHT == channel)
         {
-            deltaRight = value - channelValues[Channel::BOTH][idx];
+            deltaValues[Channel::RIGHT][idx] = value - channelValues[Channel::BOTH][idx];
         }
 
         switch (idx)
@@ -216,13 +215,13 @@ namespace wreath
                     {
                         if (Channel::BOTH == channel || Channel::LEFT == channel)
                         {
-                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::LEFT][idx], 0.f, 1.f) : value;
                             leftValue = Map(v, 0.f, 1.f, 0.f, looper.GetBufferSamples(Channel::LEFT) - 1);
                             looper.SetLoopStart(Channel::LEFT, leftValue);
                         }
                         if (Channel::BOTH == channel || Channel::RIGHT == channel)
                         {
-                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::RIGHT][idx], 0.f, 1.f) : value;
                             rightValue = Map(v, 0.f, 1.f, 0.f, looper.GetBufferSamples(Channel::RIGHT) - 1);
                             looper.SetLoopStart(Channel::RIGHT, rightValue);
                         }
@@ -263,7 +262,7 @@ namespace wreath
                     {
                         if (Channel::BOTH == channel || Channel::LEFT == channel)
                         {
-                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::LEFT][idx], 0.f, 1.f) : value;
 
                             // Backwards, from buffer's length to 50ms.
                             if (v <= 0.35f)
@@ -312,7 +311,7 @@ namespace wreath
 
                         if (Channel::BOTH == channel || Channel::RIGHT == channel)
                         {
-                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
+                            float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::RIGHT][idx], 0.f, 1.f) : value;
 
                             // Backwards, from buffer's length to 50ms.
                             if (v <= 0.35f)
@@ -382,7 +381,7 @@ namespace wreath
                 {
                     if (Channel::BOTH == channel || Channel::LEFT == channel)
                     {
-                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
+                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::LEFT][idx], 0.f, 1.f) : value;
 
                         if (looper.noteModeLeft)
                         {
@@ -413,7 +412,7 @@ namespace wreath
 
                     if (Channel::BOTH == channel || Channel::RIGHT == channel)
                     {
-                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
+                        float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::RIGHT][idx], 0.f, 1.f) : value;
 
                         if (looper.noteModeRight)
                         {
@@ -453,12 +452,12 @@ namespace wreath
                 {
                     if (Channel::BOTH == channel || Channel::LEFT == channel)
                     {
-                        float leftValue = (Channel::BOTH == channel) ? fclamp(value + deltaLeft, 0.f, 1.f) : value;
+                        float leftValue = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::LEFT][idx], 0.f, 1.f) : value;
                         looper.SetFreeze(Channel::LEFT, leftValue);
                     }
                     if (Channel::BOTH == channel || Channel::RIGHT == channel)
                     {
-                        float rightValue = (Channel::BOTH == channel) ? fclamp(value + deltaRight, 0.f, 1.f) : value;
+                        float rightValue = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::RIGHT][idx], 0.f, 1.f) : value;
                         looper.SetFreeze(Channel::RIGHT, rightValue);
                     }
                 }
