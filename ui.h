@@ -46,20 +46,21 @@ namespace wreath
     Color colors[ColorName::COLOR_LAST];
     ColorName channelColor[2]{ColorName::COLOR_ORANGE, ColorName::COLOR_ORANGE};
 
-    enum class ButtonOp
+    enum class ButtonHoldMode
     {
-        NORMAL,
-        CLEAR,
-        RESET,
-        EDIT,
+        NO_MODE,
+        GLOBAL,
+        ARM,
     };
-    ButtonOp buttonOp{ButtonOp::NORMAL};
+    ButtonHoldMode buttonHoldMode{ButtonHoldMode::NO_MODE};
     Looper::TriggerMode currentTriggerMode{};
     bool buttonPressed{};
     bool gateTriggered{};
     int32_t buttonHoldStartTime{};
+    bool recordingArmed{};
 
     bool startUp{true};
+    bool first{true};
     bool buffering{};
 
     inline void ClearLeds()
@@ -70,11 +71,13 @@ namespace wreath
         }
     }
 
-    inline void LedMeter(float value, short colorIdx, short length = 4, short offset = 0)
+    inline void LedMeter(float value, short colorIdx, short length = 4, float offset = 0.f)
     {
         value = fclamp(value, 0.f, 1.f);
-        short idx = offset + static_cast<short>(std::floor(value * length));
-        for (short i = offset; i <= length + 1; i++)
+        short idx = static_cast<short>(std::floor(value * (length)));
+        //idx %= length;
+        //short odx = static_cast<short>(std::floor(offset * (length - 1)));
+        for (short i = 0; i <= length + 1; i++)
         {
             if (i <= idx)
             {
@@ -364,7 +367,7 @@ namespace wreath
             case DaisyVersio::KNOB_4:
                 if (Channel::GLOBAL == channel)
                 {
-                    looper.feedbackLevel = value;
+                    looper.dryLevel = value;
                 }
                 else
                 {
@@ -529,7 +532,7 @@ namespace wreath
             LedMeter(looper.GetBufferSamples(Channel::LEFT) / static_cast<float>(kBufferSamples), ColorName::COLOR_RED);
 
             // Stop buffering.
-            if (hw.tap.RisingEdge())
+            if (hw.tap.RisingEdge() || (hw.gate.Trig() && !first))
             {
                 ClearLeds();
                 looper.mustStopBuffering = true;
@@ -576,25 +579,35 @@ namespace wreath
 
         // At this point the looper is running, do the normal UI loop.
 
-        if (Channel::BOTH == currentChannel)
+        if (!recordingArmed)
         {
-            Channel max = (looper.GetLoopLength(Channel::LEFT) >= looper.GetLoopLength(Channel::RIGHT)) ? Channel::LEFT : Channel::RIGHT;
-            // Show the loop position of the longest channel.
-            // Delay mode.
-            if (looper.HasLoopSync())
+            if (Channel::BOTH == currentChannel)
             {
-                LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), channelColor[max]);
+                Channel max = (looper.GetLoopLength(Channel::LEFT) >= looper.GetLoopLength(Channel::RIGHT)) ? Channel::LEFT : Channel::RIGHT;
+                // Show the loop position of the longest channel.
+                if (looper.IsFrozen())
+                {
+                    LedMeter((looper.GetLoopStart(max) + looper.GetReadPos(max)) / looper.GetBufferSamples(max), channelColor[max], 4, looper.GetLoopStart(max) / looper.GetLoopLength(max));
+                }
+                else
+                {
+                    // Delay mode.
+                    if (looper.HasLoopSync())
+                    {
+                        LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), channelColor[max]);
+                    }
+                    // Looper mode.
+                    else
+                    {
+                        LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
+                    }
+                }
             }
-            // Looper mode.
-            else
+            else if (Channel::GLOBAL != currentChannel)
             {
-                LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
+                // Show the loop position of the current channel.
+                LedMeter(looper.GetReadPos(currentChannel) / looper.GetLoopLength(currentChannel), channelColor[currentChannel]);
             }
-        }
-        else if (Channel::GLOBAL != currentChannel)
-        {
-            // Show the loop position of the current channel.
-            LedMeter(looper.GetReadPos(currentChannel) / looper.GetLoopLength(currentChannel), channelColor[currentChannel]);
         }
 
         HandleTriggerSwitch();
@@ -627,20 +640,39 @@ namespace wreath
         if (hw.tap.FallingEdge() && buttonPressed)
         {
             buttonPressed = false;
-            if (looper.IsGateMode())
+            if (ButtonHoldMode::GLOBAL == buttonHoldMode)
             {
-                looper.dryLevel = 0.f;
+                GlobalMode(true);
+                buttonHoldMode = ButtonHoldMode::NO_MODE;
             }
-            else if (ms - buttonHoldStartTime <= kMaxMsHoldForTrigger)
+            else if (ButtonHoldMode::ARM == buttonHoldMode)
             {
-                if (Channel::GLOBAL == currentChannel)
+                recordingArmed = true;
+                LedMeter(1.f, ColorName::COLOR_RED);
+                buttonHoldMode = ButtonHoldMode::NO_MODE;
+            }
+            else
+            {
+                if (recordingArmed)
                 {
-                    GlobalMode(false);
+                    looper.mustResetLooper = true;
+                    recordingArmed = false;
                 }
-                else
+                else if (looper.IsGateMode())
                 {
-                    LedMeter(1.f, ColorName::COLOR_MAGENTA);
-                    looper.mustRestart = true;
+                    looper.dryLevel = 0.f;
+                }
+                else if (ms - buttonHoldStartTime <= kMaxMsHoldForTrigger)
+                {
+                    if (Channel::GLOBAL == currentChannel)
+                    {
+                        GlobalMode(false);
+                    }
+                    else
+                    {
+                        LedMeter(1.f, ColorName::COLOR_MAGENTA);
+                        looper.mustRestart = true;
+                    }
                 }
             }
         }
@@ -648,36 +680,61 @@ namespace wreath
         // Do something while the button is pressed.
         if (buttonPressed && !looper.IsGateMode())
         {
-            if (Channel::GLOBAL != currentChannel && ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
+            if (recordingArmed)
             {
-                GlobalMode(true);
-                buttonPressed = false;
+                if (ms - buttonHoldStartTime > 1000.f)
+                {
+                    recordingArmed = false;
+                    buttonPressed = false;
+                }
             }
-            else if (Channel::GLOBAL == currentChannel && ms - buttonHoldStartTime > 1000.f)
+            else
             {
-                GlobalMode(false);
-                buttonPressed = false;
-                looper.mustResetLooper = true;
+                if (ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
+                {
+                    buttonHoldMode = ButtonHoldMode::GLOBAL;
+                    LedMeter(1.f, ColorName::COLOR_ICE);
+                }
+                if (ms - buttonHoldStartTime > 1500.f)
+                {
+                    if (Channel::GLOBAL == currentChannel)
+                    {
+                        GlobalMode(false);
+                    }
+                    buttonHoldMode = ButtonHoldMode::ARM;
+                    LedMeter(1.f, ColorName::COLOR_RED);
+                }
             }
         }
 
-        static bool first{true};
-        if (looper.IsGateMode())
+        if (Channel::GLOBAL != currentChannel && ButtonHoldMode::NO_MODE == buttonHoldMode && !first)
         {
-            if (hw.Gate())
+            if (looper.IsGateMode())
             {
-                looper.dryLevel = 1.0f;
-                gateTriggered = true;
+                if (hw.Gate())
+                {
+                    looper.dryLevel = 1.0f;
+                    gateTriggered = true;
+                }
+                else if (gateTriggered) {
+                    looper.dryLevel = 0.f;
+                    gateTriggered = false;
+                }
             }
-            else if (gateTriggered) {
-                looper.dryLevel = 0.f;
-                gateTriggered = false;
+            else if (hw.gate.Trig())
+            {
+                if (recordingArmed)
+                {
+                    GlobalMode(false);
+                    looper.mustResetLooper = true;
+                    recordingArmed = false;
+                }
+                else
+                {
+                    LedMeter(1.f, ColorName::COLOR_MAGENTA);
+                    looper.mustRestart = true;
+                }
             }
-        }
-        else if (hw.gate.Trig() && !first)
-        {
-            LedMeter(1.f, ColorName::COLOR_MAGENTA);
-            looper.mustRestart = true;
         }
 
         first = false;
