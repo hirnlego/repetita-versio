@@ -10,6 +10,34 @@ Versio: from Latin for “versatile”
 
 “Versatile repeater”
 
+## Description
+
+RV is a complex module that will require some time to master but will reward with
+a heap of fun even with just a few twists of the kobs.
+At its core it's two independent circular buffers with controllable read speed
+and its primary function is that of a looper, but its design lets RV go into
+other territories, such as delay, comb filter, stutter and distortion; it can
+play as a wavetable oscillator or provide various flavors of noise and raw
+percussions, even when nothing is connected to the inputs.
+
+The features:
+
+- 80 seconds buffer @ 48KHz
+- independent control of loop start, loop length, speed and freeze for left and
+    right channels
+- 3 play mode (loop, one shot and gated) with dedicated input
+- looper and delay mode
+- variable feedback with multimode filter in the path
+- loop start control with automatic loop wrapping
+- loop length and playback direction in a single, continuous, control
+- continuous read speed control, from 0.2x to 1x to 4x, with slew control
+- "note" mode with 4 octaves tracking
+- instantaneous buffer freezing
+- control of mix between frozen and unfrozen signals
+- stereo width control
+- feedback amount control
+- input gain control
+
 ## Controls
 
 - Knob 1 > [blend]
