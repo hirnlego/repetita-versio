@@ -369,7 +369,7 @@ namespace wreath
             case DaisyVersio::KNOB_4:
                 if (Channel::GLOBAL == channel)
                 {
-                    looper.feedbackLevel = value;
+                    looper.filterLevel = value;
                 }
                 else
                 {
@@ -388,20 +388,20 @@ namespace wreath
                     {
                         float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::LEFT][idx], 0.f, 1.f) : value;
 
-                        if (StereoLooper::NoteMode::NOTE == looper.noteModeLeft || StereoLooper::NoteMode::FLANGER == looper.noteModeLeft)
+                        if (StereoLooper::NoteMode::NOTE == looper.noteModeLeft)
                         {
                             // In "note" mode, the rate knob sets the pitch, with 4
                             // octaves span.
                             leftValue = std::floor(Map(v, 0.f, 1.f, -24, 24)) - 24;
                             leftValue = std::pow(2.f, leftValue / 12);
                         }
-                        /*
                         else if (StereoLooper::NoteMode::FLANGER == looper.noteModeLeft)
                         {
-                            // In "flanger" mode...
-                            leftValue = Map(v, 0.f, 1.f, 0.95f, 1.05f);
+                            // In "note" mode, the rate knob sets the pitch, with 4
+                            // octaves span.
+                            leftValue = Map(v, 0.f, 1.f, -24, 24);
+                            leftValue = std::pow(2.f, leftValue / 12);
                         }
-                        */
                         else
                         {
                             if (v < 0.45f)
@@ -425,20 +425,20 @@ namespace wreath
                     {
                         float v = (Channel::BOTH == channel) ? fclamp(value + deltaValues[Channel::RIGHT][idx], 0.f, 1.f) : value;
 
-                        if (StereoLooper::NoteMode::NOTE == looper.noteModeRight || StereoLooper::NoteMode::FLANGER == looper.noteModeRight)
+                        if (StereoLooper::NoteMode::NOTE == looper.noteModeRight)
                         {
                             // In "note" mode, the rate knob sets the pitch, with 4
                             // octaves span.
                             rightValue = std::floor(Map(v, 0.f, 1.f, -24, 24)) - 24;
                             rightValue = std::pow(2.f, rightValue / 12);
                         }
-                        /*
                         else if (StereoLooper::NoteMode::FLANGER == looper.noteModeRight)
                         {
-                            // In "flanger" mode...
-                            rightValue = Map(v, 0.f, 1.f, 0.95f, 1.05f);
+                            // In "note" mode, the rate knob sets the pitch, with 4
+                            // octaves span.
+                            rightValue = Map(v, 0.f, 1.f, -24, 24);
+                            rightValue = std::pow(2.f, rightValue / 12);
                         }
-                        */
                         else
                         {
                             if (v < 0.45f)
@@ -529,7 +529,7 @@ namespace wreath
                 ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_3] = 0.f; // Loop sync (off)
                 ProcessParameter(DaisyVersio::KNOB_3, globalValues[DaisyVersio::KNOB_3], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_4] = 1.f; // Feedback level (unity)
+                globalValues[DaisyVersio::KNOB_4] = 0.3f; // Filter level (low)
                 ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_5] = 0.f; // Rate slew (0)
                 ProcessParameter(DaisyVersio::KNOB_5, globalValues[DaisyVersio::KNOB_5], Channel::GLOBAL);
@@ -690,7 +690,7 @@ namespace wreath
                     else
                     {
                         LedMeter(1.f, ColorName::COLOR_PINK);
-                        looper.mustRestart = true;
+                        looper.mustRetrigger = true;
                     }
                 }
             }
@@ -712,6 +712,7 @@ namespace wreath
                 if (ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
                 {
                     buttonHoldMode = ButtonHoldMode::GLOBAL;
+                    LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_SALMON);
                 }
                 if (ms - buttonHoldStartTime > 1500.f)
                 {
@@ -750,7 +751,7 @@ namespace wreath
                 else
                 {
                     LedMeter(1.f, ColorName::COLOR_PINK);
-                    looper.mustRestart = true;
+                    looper.mustRetrigger = true;
                 }
             }
         }
