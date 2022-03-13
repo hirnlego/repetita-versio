@@ -43,7 +43,7 @@ namespace wreath
         COLOR_PINK,
         COLOR_WHITE,
         COLOR_LIME,
-        COLOR_SALMON,
+        COLOR_CREAM,
         COLOR_AQUA,
         COLOR_LAST
     };
@@ -529,7 +529,7 @@ namespace wreath
                 ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_3] = 0.f; // Loop sync (off)
                 ProcessParameter(DaisyVersio::KNOB_3, globalValues[DaisyVersio::KNOB_3], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_4] = 0.3f; // Filter level (low)
+                globalValues[DaisyVersio::KNOB_4] = 0.5f; // Filter level (50%)
                 ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
                 globalValues[DaisyVersio::KNOB_5] = 0.f; // Rate slew (0)
                 ProcessParameter(DaisyVersio::KNOB_5, globalValues[DaisyVersio::KNOB_5], Channel::GLOBAL);
@@ -598,7 +598,7 @@ namespace wreath
         {
             if (Channel::GLOBAL == currentChannel)
             {
-                LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_SALMON);
+                LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_CREAM);
             }
             else if (Channel::BOTH == currentChannel)
             {
@@ -712,7 +712,7 @@ namespace wreath
                 if (ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
                 {
                     buttonHoldMode = ButtonHoldMode::GLOBAL;
-                    LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_SALMON);
+                    LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_CREAM);
                 }
                 if (ms - buttonHoldStartTime > 1500.f)
                 {
@@ -766,7 +766,7 @@ namespace wreath
         colors[ColorName::COLOR_WHITE].Init(0.9f, 0.9f, 0.9f); // (size noon)
 
         // Looper mode.
-        colors[ColorName::COLOR_SALMON].Init(0.8f, 0.6f, 0.4f); // Ice (global mode)
+        colors[ColorName::COLOR_CREAM].Init(0.8f, 0.6f, 0.4f); // Ice (global mode)
         colors[ColorName::COLOR_GREEN].Init(0.f, 1.f, 0.f); // (size ccw)
         colors[ColorName::COLOR_LIME].Init(0.7f, 0.8f, 0.2f); // (size ccw)
         colors[ColorName::COLOR_YELLOW].Init(1.f, 0.7f, 0.f); // Yellow (flanger mode, looper)
