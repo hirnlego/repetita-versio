@@ -647,7 +647,7 @@ namespace wreath
             buttonPressed = true;
             if (looper.IsGateMode())
             {
-                looper.dryLevel = 1.f;
+                looper.Gate(true);
             }
             else
             {
@@ -679,7 +679,7 @@ namespace wreath
                 }
                 else if (looper.IsGateMode())
                 {
-                    looper.dryLevel = 0.f;
+                    looper.Gate(false);
                 }
                 else if (ms - buttonHoldStartTime <= kMaxMsHoldForTrigger)
                 {
@@ -732,11 +732,11 @@ namespace wreath
             {
                 if (hw.Gate())
                 {
-                    looper.dryLevel = 1.0f;
+                    looper.Gate(true);
                     gateTriggered = true;
                 }
                 else if (gateTriggered) {
-                    looper.dryLevel = 0.f;
+                    looper.Gate(false);
                     gateTriggered = false;
                 }
             }
