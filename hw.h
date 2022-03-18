@@ -30,6 +30,9 @@ namespace wreath
     size_t ms{};
     size_t cv1Bpm{};
 
+    QSPIHandle qspi;
+    QSPIHandle::Config qspi_config;
+
     inline static int CalculateBpm()
     {
         end = ms;
@@ -48,6 +51,17 @@ namespace wreath
     {
         hw.Init(true);
         hw.StartAdc();
+
+        qspi_config.device = QSPIHandle::Config::Device::IS25LP064A;
+        qspi_config.mode   = QSPIHandle::Config::Mode::MEMORY_MAPPED;
+
+        qspi_config.pin_config.io0 = dsy_pin(DSY_GPIOF, 8);
+        qspi_config.pin_config.io1 = dsy_pin(DSY_GPIOF, 9);
+        qspi_config.pin_config.io2 = dsy_pin(DSY_GPIOF, 7);
+        qspi_config.pin_config.io3 = dsy_pin(DSY_GPIOF, 6);
+        qspi_config.pin_config.clk = dsy_pin(DSY_GPIOF, 10);
+        qspi_config.pin_config.ncs = dsy_pin(DSY_GPIOG, 6);
+        qspi.Init(qspi_config);
 
         for (short i = 0; i < DaisyVersio::KNOB_LAST; i++)
         {
