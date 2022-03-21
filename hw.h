@@ -72,10 +72,12 @@ namespace wreath
 
     inline void UpdateClock()
     {
+        /*
         if (ms > 10000)
         {
             ms = 0;
         }
+        */
         ms++;
     }
 
