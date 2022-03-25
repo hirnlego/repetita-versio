@@ -29,7 +29,6 @@ namespace wreath
     float channelValues[3][7]{};
     float deltaValues[2][7]{};
     float knobValues[7]{};
-    float globalValues[7]{};
 
     enum ColorName
     {
@@ -75,42 +74,23 @@ namespace wreath
         float filterLevel;
         float rateSlew;
         float stereoWidth;
+        float degradation;
     };
 
-    Settings settings{1.f / kMaxGain, 0.5f, 0.f, 0.5f, 0.f, 1.f};
+    Settings defaultSettings{1.f / kMaxGain, 0.5f, 0.f, 0.5f, 0.f, 1.f, 0.f};
+    Settings localSettings{};
 
-    PersistentStorage<Settings> storage(qspi);
+    PersistentStorage<Settings> storage(hw.seed.qspi);
 
     bool operator!=(const Settings& lhs, const Settings& rhs)
     {
-        return lhs.inputGain != rhs.inputGain || lhs.filterType != rhs.filterType;
+        return lhs.inputGain != rhs.inputGain || lhs.filterType != rhs.filterType || lhs.loopSync != rhs.loopSync || lhs.filterLevel != rhs.filterLevel || lhs.rateSlew != rhs.rateSlew || lhs.stereoWidth != rhs.stereoWidth || lhs.degradation != rhs.degradation;
     }
 
     Settings& operator* (const Settings& settings) { return *settings; }
 
-/*
-    float DSY_QSPI_BSS qspi_buffer[5];
+    bool mustUpdateStorage{};
 
-    struct CONFIGURATION
-    {
-    };
-
-    CONFIGURATION curent_config;
-
-    // https://forum.electro-smith.com/t/persisting-data-to-from-flash/502/27
-    void SaveConfig(uint32_t slot)
-    {
-        uint32_t base = 0x90000000;
-        base += slot * 4096; // works only because sizeof(CONFIGURATION) < 4096
-        hw.seed.qspi.Erase(base, base + sizeof(CONFIGURATION));
-        hw.seed.qspi.Write(base, sizeof(CONFIGURATION), (uint8_t *)&curent_config);
-    }
-
-    void LoadConfig(uint32_t slot)
-    {
-        memcpy(&curent_config, reinterpret_cast<void *>(0x90000000 + (slot * 4096)), sizeof(CONFIGURATION));
-    }
-*/
     inline void ClearLeds()
     {
         for (size_t i = 0; i < DaisyVersio::LED_LAST; i++)
@@ -219,11 +199,7 @@ namespace wreath
         // Keep track of parameters values only after startup.
         if (!looper.IsStartingUp())
         {
-            if (Channel::GLOBAL == channel)
-            {
-                globalValues[idx] = value;
-            }
-            else
+            if (Channel::GLOBAL != channel)
             {
                 channelValues[channel][idx] = value;
             }
@@ -247,8 +223,9 @@ namespace wreath
         case DaisyVersio::KNOB_0:
             if (Channel::GLOBAL == channel)
             {
-                settings.inputGain = looper.inputGain = value * kMaxGain;
-                storage.Save();
+                localSettings.inputGain = value;
+                looper.inputGain = value * kMaxGain;
+                mustUpdateStorage = true;
             }
             else
             {
@@ -260,9 +237,8 @@ namespace wreath
         {
             if (Channel::GLOBAL == channel)
             {
-                //looper.OffsetLoopers(Map(value, 0.f, 1.f, 0.f, looper.GetLoopLength(Channel::RIGHT)));
-                settings.stereoWidth = looper.stereoWidth = Map(value, 0.f, 1.f, 0.f, 1.f);
-                storage.Save();
+                localSettings.stereoWidth = looper.stereoWidth = value;
+                mustUpdateStorage = true;
             }
             else
             {
@@ -297,8 +273,8 @@ namespace wreath
                 {
                     looper.filterType = StereoLooper::FilterType::HP;
                 }
-                settings.filterType = value;
-                storage.Save();
+                localSettings.filterType = value;
+                mustUpdateStorage = true;
             }
             else
             {
@@ -310,10 +286,9 @@ namespace wreath
         {
             if (Channel::GLOBAL == channel)
             {
-                // looper.SetSamplesToFade(Map(value, 0.f, 1.f, 0.f, kMaxSamplesToFade));
+                localSettings.loopSync = value;
                 looper.SetLoopSync(value >= 0.5);
-                settings.loopSync = value;
-                storage.Save();
+                mustUpdateStorage = true;
             }
             else
             {
@@ -421,8 +396,8 @@ namespace wreath
         case DaisyVersio::KNOB_4:
             if (Channel::GLOBAL == channel)
             {
-                settings.filterLevel = looper.filterLevel = value;
-                storage.Save();
+                localSettings.filterLevel = looper.filterLevel = value;
+                mustUpdateStorage = true;
             }
             else
             {
@@ -433,8 +408,9 @@ namespace wreath
         case DaisyVersio::KNOB_5:
             if (Channel::GLOBAL == channel)
             {
-                settings.rateSlew = looper.rateSlew = Map(value, 0.f, 1.f, 0.f, kMaxRateSlew);
-                storage.Save();
+                localSettings.rateSlew = value;
+                looper.rateSlew = Map(value, 0.f, 1.f, 0.f, kMaxRateSlew);
+                mustUpdateStorage = true;
             }
             else
             {
@@ -518,7 +494,9 @@ namespace wreath
         case DaisyVersio::KNOB_6:
             if (Channel::GLOBAL == channel)
             {
+                localSettings.degradation = value;
                 looper.SetDegradation(value);
+                mustUpdateStorage = true;
             }
             else
             {
@@ -568,6 +546,9 @@ namespace wreath
         {
             if (startUp)
             {
+                // TODO: Restore defaults when holding the button during startup.
+                // storage.RestoreDefaults();
+
                 startUp = false;
 
                 // Init the dry/wet mix parameter.
@@ -575,20 +556,14 @@ namespace wreath
                 ProcessParameter(DaisyVersio::KNOB_0, knobValues[DaisyVersio::KNOB_0], Channel::BOTH);
 
                 // Init the global parameters.
-                globalValues[DaisyVersio::KNOB_0] = settings.inputGain;
-                ProcessParameter(DaisyVersio::KNOB_0, globalValues[DaisyVersio::KNOB_0], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_1] = settings.stereoWidth;
-                ProcessParameter(DaisyVersio::KNOB_1, globalValues[DaisyVersio::KNOB_1], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_2] = settings.filterType;
-                ProcessParameter(DaisyVersio::KNOB_2, globalValues[DaisyVersio::KNOB_2], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_3] = settings.loopSync;
-                ProcessParameter(DaisyVersio::KNOB_3, globalValues[DaisyVersio::KNOB_3], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_4] = settings.filterLevel;
-                ProcessParameter(DaisyVersio::KNOB_4, globalValues[DaisyVersio::KNOB_4], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_5] = settings.rateSlew;
-                ProcessParameter(DaisyVersio::KNOB_5, globalValues[DaisyVersio::KNOB_5], Channel::GLOBAL);
-                globalValues[DaisyVersio::KNOB_6] = 0.f; //
-                ProcessParameter(DaisyVersio::KNOB_6, globalValues[DaisyVersio::KNOB_6], Channel::GLOBAL);
+                Settings &storedSettings = storage.GetSettings();
+                ProcessParameter(DaisyVersio::KNOB_0, storedSettings.inputGain, Channel::GLOBAL);
+                ProcessParameter(DaisyVersio::KNOB_1, storedSettings.stereoWidth, Channel::GLOBAL);
+                ProcessParameter(DaisyVersio::KNOB_2, storedSettings.filterType, Channel::GLOBAL);
+                ProcessParameter(DaisyVersio::KNOB_3, storedSettings.loopSync, Channel::GLOBAL);
+                ProcessParameter(DaisyVersio::KNOB_4, storedSettings.filterLevel, Channel::GLOBAL);
+                ProcessParameter(DaisyVersio::KNOB_5, storedSettings.rateSlew, Channel::GLOBAL);
+                ProcessParameter(DaisyVersio::KNOB_6, storedSettings.degradation, Channel::GLOBAL);
             }
 
             return;
@@ -705,7 +680,7 @@ namespace wreath
             }
             else
             {
-                buttonHoldStartTime = ms;
+                buttonHoldStartTime = System::GetNow();
             }
         }
 
@@ -735,7 +710,7 @@ namespace wreath
                 {
                     looper.Gate(false);
                 }
-                else if (ms - buttonHoldStartTime <= kMaxMsHoldForTrigger)
+                else if (System::GetNow() - buttonHoldStartTime <= kMaxMsHoldForTrigger)
                 {
                     if (Channel::GLOBAL == currentChannel)
                     {
@@ -755,7 +730,7 @@ namespace wreath
         {
             if (recordingArmed)
             {
-                if (ms - buttonHoldStartTime > 1000.f)
+                if (System::GetNow() - buttonHoldStartTime > 1000.f)
                 {
                     recordingArmed = false;
                     buttonPressed = false;
@@ -763,12 +738,12 @@ namespace wreath
             }
             else
             {
-                if (ms - buttonHoldStartTime > kMaxMsHoldForTrigger)
+                if (System::GetNow() - buttonHoldStartTime > kMaxMsHoldForTrigger)
                 {
                     buttonHoldMode = ButtonHoldMode::GLOBAL;
                     LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_CREAM);
                 }
-                if (ms - buttonHoldStartTime > 1500.f)
+                if (System::GetNow() - buttonHoldStartTime > 1500.f)
                 {
                     if (Channel::GLOBAL == currentChannel)
                     {
@@ -816,9 +791,7 @@ namespace wreath
 
     inline void InitUi()
     {
-        storage.Init(settings);
-
-        //storage.RestoreDefaults();
+        storage.Init(defaultSettings);
 
         colors[ColorName::COLOR_RED].Init(1.f, 0.f, 0.f); // Red (buffering)
 
@@ -840,5 +813,19 @@ namespace wreath
         colors[ColorName::COLOR_BLUE].Init(0.f, 0.f, 1.f);    // Blue (size 10 o'clock)
         // colors[ColorName::COLOR_PINK].Init(0.9f, 0.f, 0.4f); // Hot pink
         // colors[ColorName::COLOR_PINK].Init(1.f, 0.f, 1.f); // Magenta (trigger/gate)
+    }
+
+    void ProcessStorage()
+    {
+        if (mustUpdateStorage)
+        {
+            if (!looper.IsStartingUp())
+            {
+                Settings &storedSettings = storage.GetSettings();
+                storedSettings = localSettings;
+                storage.Save();
+            }
+            mustUpdateStorage = false;
+        }
     }
 }

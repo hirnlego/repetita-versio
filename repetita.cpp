@@ -6,7 +6,6 @@ using namespace wreath;
 
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
 {
-    UpdateClock();
     ProcessControls();
     ProcessUi();
 
@@ -18,8 +17,6 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
         float leftOut{};
         float rightOut{};
         looper.Process(leftIn, rightIn, leftOut, rightOut);
-
-        //AudioMeter(leftIn, rightIn, leftOut, rightOut);
 
         OUT_L[i] = leftOut;
         OUT_R[i] = rightOut;
@@ -47,5 +44,6 @@ int main(void)
 
     while (1)
     {
+        ProcessStorage();
     }
 }
