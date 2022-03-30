@@ -39,6 +39,7 @@ up to 10 seconds
 - stereo width control
 - filter amount control
 - input gain control
+- automatic saving and recalling of the global options
 
 ## Controls
 
@@ -158,7 +159,8 @@ The buffer can be easily reset (see below).
 ## Triggering the looper
 
 When the bottom switch is either in the center or right position, the rapid
-press of the button restarts the reproduction at the start position. In one-shot
+press of the button restarts the reproduction at the start position (it can also
+be useful to re-synchronize the two channels when they've diverged). In one-shot
 mode (center position), it stops at the end of the loop. The same thing happens
 when a positive voltage is received at the relative input.
 
@@ -271,8 +273,9 @@ position, so the channel's value is updated.
 Splitting the channels can produce a variety of interesting and complex effects,
 but there are two main caveats to be aware of:
 
-1) it is often impossible to realign the channels because twisting the knobs
-produce destructive modifications to both buffers.
+1) it is sometimes impossible to realign the channels because twisting the knobs
+produce destructive modifications to both buffers, but dialing the same
+parameters for the two channels and re-triggering the looper might just do it.
 
 2) more important and less obvious: for the same reason saw above when talking
 about the *global mode*, the modulation will always acts only on the currently

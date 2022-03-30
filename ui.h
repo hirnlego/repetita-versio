@@ -82,14 +82,12 @@ namespace wreath
 
     PersistentStorage<Settings> storage(hw.seed.qspi);
 
+    bool mustUpdateStorage{};
+
     bool operator!=(const Settings& lhs, const Settings& rhs)
     {
         return lhs.inputGain != rhs.inputGain || lhs.filterType != rhs.filterType || lhs.loopSync != rhs.loopSync || lhs.filterLevel != rhs.filterLevel || lhs.rateSlew != rhs.rateSlew || lhs.stereoWidth != rhs.stereoWidth || lhs.degradation != rhs.degradation;
     }
-
-    Settings& operator* (const Settings& settings) { return *settings; }
-
-    bool mustUpdateStorage{};
 
     inline void ClearLeds()
     {
