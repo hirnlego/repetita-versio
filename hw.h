@@ -7,7 +7,7 @@ namespace wreath
     using namespace daisy;
 
     // The minimum difference in parameter value to be registered.
-    constexpr float kMinValueDelta{0.002f};
+    constexpr float kMinValueDelta{0.003f};
     // The minimum difference in parameter value to be considered picked up.
     constexpr float kMinPickupValueDelta{0.01f};
     // The trigger threshold value.

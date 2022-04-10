@@ -21,7 +21,7 @@ namespace wreath
         LEFT,
         RIGHT,
         BOTH,
-        GLOBAL,
+        SETTINGS,
     };
     Channel prevChannel{Channel::BOTH};
     Channel currentChannel{Channel::BOTH};
@@ -49,14 +49,20 @@ namespace wreath
     Color colors[ColorName::COLOR_LAST];
     ColorName channelColor[2]{ColorName::COLOR_ORANGE, ColorName::COLOR_ORANGE};
 
+    enum TriggerMode
+    {
+        ONESHOT,
+        REC,
+        LOOP,
+    };
     enum class ButtonHoldMode
     {
         NO_MODE,
-        GLOBAL,
+        SETTINGS,
         ARM,
     };
     ButtonHoldMode buttonHoldMode{ButtonHoldMode::NO_MODE};
-    Looper::TriggerMode currentTriggerMode{};
+    TriggerMode currentTriggerMode{};
     bool buttonPressed{};
     bool gateTriggered{};
     int32_t buttonHoldStartTime{};
@@ -123,7 +129,7 @@ namespace wreath
 
     inline void AudioMeter(float leftIn, float rightIn, float leftOut, float rightOut)
     {
-        if (!looper.IsBuffering() && Channel::GLOBAL != currentChannel)
+        if (!looper.IsBuffering() && Channel::SETTINGS != currentChannel)
         {
             static float inLeft{};
             static float inRight{};
@@ -147,12 +153,12 @@ namespace wreath
         return bMin + k * (value - aMin);
     }
 
-    void GlobalMode(bool active)
+    void SettingsMode(bool active)
     {
         if (active)
         {
             prevChannel = currentChannel;
-            currentChannel = Channel::GLOBAL;
+            currentChannel = Channel::SETTINGS;
         }
         else
         {
@@ -171,25 +177,39 @@ namespace wreath
         }
 
         // Quit edit mode when changing.
-        if (Channel::GLOBAL == currentChannel)
+        if (Channel::SETTINGS == currentChannel)
         {
-            GlobalMode(false);
+            SettingsMode(false);
         }
 
         currentChannel = prevChannel = static_cast<Channel>(value);
     }
 
     // 0: center, 1: left, 2: right
-    static void HandleTriggerSwitch()
+    static void HandleTriggerSwitch(bool init = false)
     {
         short value = hw.sw[DaisyVersio::SW_1].Read();
-        if (value == currentTriggerMode)
+        if (value == currentTriggerMode && !init)
         {
             return;
         }
 
-        currentTriggerMode = static_cast<Looper::TriggerMode>(value);
-        looper.SetTriggerMode(currentTriggerMode);
+        currentTriggerMode = static_cast<TriggerMode>(value);
+
+        switch (currentTriggerMode)
+        {
+        case TriggerMode::REC:
+            looper.SetLooping(true);
+            break;
+        case TriggerMode::ONESHOT:
+            looper.mustStop = true;
+            looper.SetLooping(false);
+            break;
+        case TriggerMode::LOOP:
+            looper.mustStart = true;
+            looper.SetLooping(true);
+            break;
+        }
     }
 
     inline void ProcessParameter(short idx, float value, Channel channel)
@@ -197,7 +217,7 @@ namespace wreath
         // Keep track of parameters values only after startup.
         if (!looper.IsStartingUp())
         {
-            if (Channel::GLOBAL != channel)
+            if (Channel::SETTINGS != channel)
             {
                 channelValues[channel][idx] = value;
             }
@@ -219,7 +239,7 @@ namespace wreath
         {
         // Blend
         case DaisyVersio::KNOB_0:
-            if (Channel::GLOBAL == channel)
+            if (Channel::SETTINGS == channel)
             {
                 localSettings.inputGain = value;
                 looper.inputGain = value * kMaxGain;
@@ -233,7 +253,7 @@ namespace wreath
         // Start
         case DaisyVersio::KNOB_1:
         {
-            if (Channel::GLOBAL == channel)
+            if (Channel::SETTINGS == channel)
             {
                 localSettings.stereoWidth = looper.stereoWidth = value;
                 mustUpdateStorage = true;
@@ -257,7 +277,7 @@ namespace wreath
         break;
         // Tone
         case DaisyVersio::KNOB_2:
-            if (Channel::GLOBAL == channel)
+            if (Channel::SETTINGS == channel)
             {
                 if (value < 0.33f)
                 {
@@ -282,7 +302,7 @@ namespace wreath
         // Size
         case DaisyVersio::KNOB_3:
         {
-            if (Channel::GLOBAL == channel)
+            if (Channel::SETTINGS == channel)
             {
                 localSettings.loopSync = value;
                 looper.SetLoopSync(value >= 0.5);
@@ -392,7 +412,7 @@ namespace wreath
         break;
         // Decay
         case DaisyVersio::KNOB_4:
-            if (Channel::GLOBAL == channel)
+            if (Channel::SETTINGS == channel)
             {
                 localSettings.filterLevel = looper.filterLevel = value;
                 mustUpdateStorage = true;
@@ -404,7 +424,7 @@ namespace wreath
             break;
         // Rate
         case DaisyVersio::KNOB_5:
-            if (Channel::GLOBAL == channel)
+            if (Channel::SETTINGS == channel)
             {
                 localSettings.rateSlew = value;
                 looper.rateSlew = Map(value, 0.f, 1.f, 0.f, kMaxRateSlew);
@@ -490,7 +510,7 @@ namespace wreath
             break;
         // Freeze
         case DaisyVersio::KNOB_6:
-            if (Channel::GLOBAL == channel)
+            if (Channel::SETTINGS == channel)
             {
                 localSettings.degradation = value;
                 looper.SetDegradation(value);
@@ -553,15 +573,15 @@ namespace wreath
                 knobValues[DaisyVersio::KNOB_0] = knobs[DaisyVersio::KNOB_0].Process();
                 ProcessParameter(DaisyVersio::KNOB_0, knobValues[DaisyVersio::KNOB_0], Channel::BOTH);
 
-                // Init the global parameters.
+                // Init the settings.
                 Settings &storedSettings = storage.GetSettings();
-                ProcessParameter(DaisyVersio::KNOB_0, storedSettings.inputGain, Channel::GLOBAL);
-                ProcessParameter(DaisyVersio::KNOB_1, storedSettings.stereoWidth, Channel::GLOBAL);
-                ProcessParameter(DaisyVersio::KNOB_2, storedSettings.filterType, Channel::GLOBAL);
-                ProcessParameter(DaisyVersio::KNOB_3, storedSettings.loopSync, Channel::GLOBAL);
-                ProcessParameter(DaisyVersio::KNOB_4, storedSettings.filterLevel, Channel::GLOBAL);
-                ProcessParameter(DaisyVersio::KNOB_5, storedSettings.rateSlew, Channel::GLOBAL);
-                ProcessParameter(DaisyVersio::KNOB_6, storedSettings.degradation, Channel::GLOBAL);
+                ProcessParameter(DaisyVersio::KNOB_0, storedSettings.inputGain, Channel::SETTINGS);
+                ProcessParameter(DaisyVersio::KNOB_1, storedSettings.stereoWidth, Channel::SETTINGS);
+                ProcessParameter(DaisyVersio::KNOB_2, storedSettings.filterType, Channel::SETTINGS);
+                ProcessParameter(DaisyVersio::KNOB_3, storedSettings.loopSync, Channel::SETTINGS);
+                ProcessParameter(DaisyVersio::KNOB_4, storedSettings.filterLevel, Channel::SETTINGS);
+                ProcessParameter(DaisyVersio::KNOB_5, storedSettings.rateSlew, Channel::SETTINGS);
+                ProcessParameter(DaisyVersio::KNOB_6, storedSettings.degradation, Channel::SETTINGS);
             }
 
             return;
@@ -583,7 +603,7 @@ namespace wreath
             return;
         }
 
-        // The looper is ready, do some configuration before start.
+        // The looper is ready, do some configuration before starting.
         if (looper.IsReady())
         {
             if (!buffering)
@@ -592,8 +612,7 @@ namespace wreath
             }
             buffering = false;
 
-            currentTriggerMode = static_cast<Looper::TriggerMode>(hw.sw[DaisyVersio::SW_1].Read());
-            looper.SetTriggerMode(currentTriggerMode);
+            HandleTriggerSwitch(true);
 
             // Init all the parameters with the relative knobs position.
             for (size_t i = 0; i < DaisyVersio::KNOB_LAST; i++)
@@ -623,7 +642,7 @@ namespace wreath
 
         if (!recordingArmed)
         {
-            if (Channel::GLOBAL == currentChannel)
+            if (Channel::SETTINGS == currentChannel)
             {
                 LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_CREAM);
             }
@@ -649,7 +668,7 @@ namespace wreath
                     }
                 }
             }
-            else if (Channel::GLOBAL != currentChannel)
+            else if (Channel::SETTINGS != currentChannel)
             {
                 // Show the loop position of the current channel.
                 LedMeter(looper.GetReadPos(currentChannel) / looper.GetLoopLength(currentChannel), channelColor[currentChannel]);
@@ -672,9 +691,9 @@ namespace wreath
         if (hw.tap.RisingEdge() && !buttonPressed)
         {
             buttonPressed = true;
-            if (looper.IsGateMode())
+            if (TriggerMode::REC == currentTriggerMode)
             {
-                looper.Gate(true);
+                // TODO: Start recording
             }
             else
             {
@@ -686,9 +705,9 @@ namespace wreath
         if (hw.tap.FallingEdge() && buttonPressed)
         {
             buttonPressed = false;
-            if (ButtonHoldMode::GLOBAL == buttonHoldMode)
+            if (ButtonHoldMode::SETTINGS == buttonHoldMode)
             {
-                GlobalMode(true);
+                SettingsMode(true);
                 buttonHoldMode = ButtonHoldMode::NO_MODE;
             }
             else if (ButtonHoldMode::ARM == buttonHoldMode)
@@ -704,15 +723,15 @@ namespace wreath
                     looper.mustResetLooper = true;
                     recordingArmed = false;
                 }
-                else if (looper.IsGateMode())
+                else if (TriggerMode::REC == currentTriggerMode)
                 {
-                    looper.Gate(false);
+                    // TODO: Stop recording
                 }
                 else if (System::GetNow() - buttonHoldStartTime <= kMaxMsHoldForTrigger)
                 {
-                    if (Channel::GLOBAL == currentChannel)
+                    if (Channel::SETTINGS == currentChannel)
                     {
-                        GlobalMode(false);
+                        SettingsMode(false);
                     }
                     else
                     {
@@ -724,7 +743,7 @@ namespace wreath
         }
 
         // Do something while the button is pressed.
-        if (buttonPressed && !looper.IsGateMode())
+        if (buttonPressed)
         {
             if (recordingArmed)
             {
@@ -738,14 +757,14 @@ namespace wreath
             {
                 if (System::GetNow() - buttonHoldStartTime > kMaxMsHoldForTrigger)
                 {
-                    buttonHoldMode = ButtonHoldMode::GLOBAL;
+                    buttonHoldMode = ButtonHoldMode::SETTINGS;
                     LedMeter(1.f, looper.GetLoopSync() ? ColorName::COLOR_ICE : ColorName::COLOR_CREAM);
                 }
                 if (System::GetNow() - buttonHoldStartTime > 1500.f)
                 {
-                    if (Channel::GLOBAL == currentChannel)
+                    if (Channel::SETTINGS == currentChannel)
                     {
-                        GlobalMode(false);
+                        SettingsMode(false);
                     }
                     buttonHoldMode = ButtonHoldMode::ARM;
                     LedMeter(1.f, ColorName::COLOR_RED);
@@ -753,28 +772,19 @@ namespace wreath
             }
         }
 
-        if (Channel::GLOBAL != currentChannel && ButtonHoldMode::NO_MODE == buttonHoldMode && !first)
+        if (Channel::SETTINGS != currentChannel && ButtonHoldMode::NO_MODE == buttonHoldMode && !first)
         {
-            if (looper.IsGateMode())
-            {
-                if (hw.Gate())
-                {
-                    looper.Gate(true);
-                    gateTriggered = true;
-                }
-                else if (gateTriggered)
-                {
-                    looper.Gate(false);
-                    gateTriggered = false;
-                }
-            }
-            else if (hw.gate.Trig())
+            if (hw.gate.Trig())
             {
                 if (recordingArmed)
                 {
-                    GlobalMode(false);
+                    SettingsMode(false);
                     looper.mustResetLooper = true;
                     recordingArmed = false;
+                }
+                else if (TriggerMode::REC == currentTriggerMode)
+                {
+                    // TODO: Start/stop recording
                 }
                 else
                 {
@@ -796,7 +806,7 @@ namespace wreath
         colors[ColorName::COLOR_WHITE].Init(0.9f, 0.9f, 0.9f); // (size noon)
 
         // Looper mode.
-        colors[ColorName::COLOR_CREAM].Init(0.8f, 0.6f, 0.4f); // Ice (global mode)
+        colors[ColorName::COLOR_CREAM].Init(0.8f, 0.6f, 0.4f); // Ice (settings mode)
         colors[ColorName::COLOR_GREEN].Init(0.f, 1.f, 0.f);    // (size ccw)
         colors[ColorName::COLOR_LIME].Init(0.7f, 0.8f, 0.2f);  // (size ccw)
         colors[ColorName::COLOR_YELLOW].Init(1.f, 0.7f, 0.f);  // Yellow (flanger mode, looper)
@@ -804,13 +814,13 @@ namespace wreath
 
         // Delay mode.
 
-        colors[ColorName::COLOR_ICE].Init(0.5f, 0.5f, 1.f);   // Ice (global mode)
+        colors[ColorName::COLOR_ICE].Init(0.5f, 0.5f, 1.f);   // Ice (settings mode)
         colors[ColorName::COLOR_PURPLE].Init(0.5f, 0.f, 1.f); // Purple (size ccw)
         colors[ColorName::COLOR_PINK].Init(0.5f, 0.4f, 1.f);  // Purple (size ccw)
         colors[ColorName::COLOR_AQUA].Init(0.2f, 0.5f, 1.f);  // Blue (size 10 o'clock)
         colors[ColorName::COLOR_BLUE].Init(0.f, 0.f, 1.f);    // Blue (size 10 o'clock)
         // colors[ColorName::COLOR_PINK].Init(0.9f, 0.f, 0.4f); // Hot pink
-        // colors[ColorName::COLOR_PINK].Init(1.f, 0.f, 1.f); // Magenta (trigger/gate)
+        // colors[ColorName::COLOR_PINK].Init(1.f, 0.f, 1.f); // Magenta (trigger)
     }
 
     void ProcessStorage()
