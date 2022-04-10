@@ -26,7 +26,7 @@ The features:
 - 80 seconds buffer @ 48KHz
 - independent control for the left and right channels of loop start, loop
 length, speed and freeze amount
-- 3 button mode (loop, one-shot and gated) with input
+- three button modes (loop, one-shot and triggered recording) with input
 - looper and delay mode
 - variable decay with multi-mode filter and degradation in the feedback path
 - loop start control with automatic loop wrapping
@@ -118,18 +118,16 @@ signal, turn the knob fully ccw at 0%.
 **Button mode:** The bottom switch sets different behaviors for the looper and
 how the button and the relative input work:
 
-- left > the looper is both recording and reproducing but the dry signal is
-recorded only when the button is depressed or a positive voltage is present at
-the input. Caveat: when the switch is in this position, the *global mode* is not
-accessible;
-- center > the looper reproduction is stopped and can be re-triggered for a one-
-shot loop by pressing the button or with a positive voltage at the input. The
-reproduction always begins at the start position defined by the **Start** knob;
-- right > the looper is continuously reproducing its contents. A press of the
-button, or a positive voltage at the input, restarts the reproduction at the
-position defined by the **Start** knob.
-
-**Trigger input:** Gate or trigger depending on the relative switch.
+- left > the looper is continuously reproducing but the recording is stopped.
+One press of the button - or a positive voltage at the input - starts the
+recording, a second press stops it;
+- center > the looper is continuously recording but the reproduction is stopped
+and can be triggered for a one-shot loop by pressing the button or with a
+positive voltage at the input. The reproduction always begins at the start
+position defined by the **Start** knob;
+- right > the looper is continuously recording and playing back its content.
+A press of the button, or a positive voltage at the input, restarts the
+reproduction at the position defined by the **Start** knob.
 
 ## Startup state
 
