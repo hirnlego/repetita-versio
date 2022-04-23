@@ -30,7 +30,6 @@ int main(void)
     StereoLooper::Conf conf
     {
         StereoLooper::Mode::MONO,
-        Looper::TriggerMode::LOOP,
         Movement::NORMAL,
         Direction::FORWARD,
         rate: 1.0f

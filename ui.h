@@ -650,22 +650,16 @@ namespace wreath
             {
                 Channel max = (looper.GetLoopLength(Channel::LEFT) >= looper.GetLoopLength(Channel::RIGHT)) ? Channel::LEFT : Channel::RIGHT;
                 // Show the loop position of the longest channel.
-                if (looper.IsFrozen())
+
+                // Delay mode.
+                if (looper.HasLoopSync())
                 {
-                    LedMeter((looper.GetLoopStart(max) + looper.GetReadPos(max)) / looper.GetBufferSamples(max), channelColor[max], 4, looper.GetLoopStart(max) / looper.GetLoopLength(max));
+                    LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), channelColor[max]);
                 }
+                // Looper mode.
                 else
                 {
-                    // Delay mode.
-                    if (looper.HasLoopSync())
-                    {
-                        LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), channelColor[max]);
-                    }
-                    // Looper mode.
-                    else
-                    {
-                        LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
-                    }
+                    LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
                 }
             }
             else if (Channel::SETTINGS != currentChannel)
@@ -736,7 +730,14 @@ namespace wreath
                     else
                     {
                         LedMeter(1.f, ColorName::COLOR_PINK);
-                        looper.mustRetrigger = true;
+                        if (TriggerMode::ONESHOT == currentTriggerMode)
+                        {
+                            looper.mustRestart = true;
+                        }
+                        else
+                        {
+                            looper.mustRetrigger = true;
+                        }
                     }
                 }
             }
@@ -789,7 +790,14 @@ namespace wreath
                 else
                 {
                     LedMeter(1.f, ColorName::COLOR_PINK);
-                    looper.mustRetrigger = true;
+                    if (TriggerMode::ONESHOT == currentTriggerMode)
+                    {
+                        looper.mustRestart = true;
+                    }
+                    else
+                    {
+                        looper.mustRetrigger = true;
+                    }
                 }
             }
         }
