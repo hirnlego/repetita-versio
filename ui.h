@@ -51,9 +51,9 @@ namespace wreath
 
     enum TriggerMode
     {
-        ONESHOT,
-        REC,
         LOOP,
+        REC,
+        ONESHOT,
     };
     enum class ButtonHoldMode
     {
@@ -201,28 +201,20 @@ namespace wreath
         switch (currentTriggerMode)
         {
         case TriggerMode::REC:
+            looper.mustStopWriting = true;
+            looper.SetLooping(true);
+            break;
+        case TriggerMode::LOOP:
+            recordingLeftTriggered = false;
+            recordingRightTriggered = false;
+            looper.mustStartWritingLeft = true;
+            looper.mustStartWritingRight = true;
             looper.mustStartReading = true;
-            if (Channel::BOTH == currentChannel || Channel::LEFT == currentChannel)
-            {
-                looper.mustStopWritingLeft = true;
-            }
-            if (Channel::BOTH == currentChannel || Channel::RIGHT == currentChannel)
-            {
-                looper.mustStopWritingRight = true;
-            }
             looper.SetLooping(true);
             break;
         case TriggerMode::ONESHOT:
             looper.mustStopReading = true;
-            looper.mustStartWritingLeft = true;
-            looper.mustStartWritingRight = true;
-            recordingLeftTriggered = false;
-            recordingRightTriggered = false;
             looper.SetLooping(false);
-            break;
-        case TriggerMode::LOOP:
-            looper.mustStartReading = true;
-            looper.SetLooping(true);
             break;
         }
     }
