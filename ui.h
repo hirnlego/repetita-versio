@@ -67,6 +67,8 @@ namespace wreath
     bool gateTriggered{};
     int32_t buttonHoldStartTime{};
     bool recordingArmed{};
+    bool recordingLeftTriggered{};
+    bool recordingRightTriggered{};
 
     bool startUp{true};
     bool first{true};
@@ -199,16 +201,65 @@ namespace wreath
         switch (currentTriggerMode)
         {
         case TriggerMode::REC:
+            looper.mustStartReading = true;
+            if (Channel::BOTH == currentChannel || Channel::LEFT == currentChannel)
+            {
+                looper.mustStopWritingLeft = true;
+            }
+            if (Channel::BOTH == currentChannel || Channel::RIGHT == currentChannel)
+            {
+                looper.mustStopWritingRight = true;
+            }
             looper.SetLooping(true);
             break;
         case TriggerMode::ONESHOT:
-            looper.mustStop = true;
+            looper.mustStopReading = true;
+            looper.mustStartWritingLeft = true;
+            looper.mustStartWritingRight = true;
+            recordingLeftTriggered = false;
+            recordingRightTriggered = false;
             looper.SetLooping(false);
             break;
         case TriggerMode::LOOP:
-            looper.mustStart = true;
+            looper.mustStartReading = true;
             looper.SetLooping(true);
             break;
+        }
+    }
+
+    void HandleTriggerRecording()
+    {
+        if (recordingLeftTriggered)
+        {
+            if (Channel::BOTH == currentChannel || Channel::LEFT == currentChannel)
+            {
+                looper.mustStopWritingLeft = true;
+            }
+            recordingLeftTriggered = false;
+        }
+        else
+        {
+            if (Channel::BOTH == currentChannel || Channel::LEFT == currentChannel)
+            {
+                looper.mustStartWritingLeft = true;
+            }
+            recordingLeftTriggered = true;
+        }
+        if (recordingRightTriggered)
+        {
+            if (Channel::BOTH == currentChannel || Channel::RIGHT == currentChannel)
+            {
+                looper.mustStopWritingRight = true;
+            }
+            recordingRightTriggered = false;
+        }
+        else
+        {
+            if (Channel::BOTH == currentChannel || Channel::RIGHT == currentChannel)
+            {
+                looper.mustStartWritingRight = true;
+            }
+            recordingRightTriggered = true;
         }
     }
 
@@ -650,22 +701,23 @@ namespace wreath
             {
                 Channel max = (looper.GetLoopLength(Channel::LEFT) >= looper.GetLoopLength(Channel::RIGHT)) ? Channel::LEFT : Channel::RIGHT;
                 // Show the loop position of the longest channel.
-
+                ColorName color = recordingLeftTriggered || recordingRightTriggered ? ColorName::COLOR_RED : channelColor[max];
                 // Delay mode.
                 if (looper.HasLoopSync())
                 {
-                    LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), channelColor[max]);
+                    LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), color);
                 }
                 // Looper mode.
                 else
                 {
-                    LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), channelColor[max]);
+                    LedMeter(looper.GetWritePos(max) / looper.GetBufferSamples(max), color);
                 }
             }
             else if (Channel::SETTINGS != currentChannel)
             {
                 // Show the loop position of the current channel.
-                LedMeter(looper.GetReadPos(currentChannel) / looper.GetLoopLength(currentChannel), channelColor[currentChannel]);
+                ColorName color = recordingLeftTriggered || recordingRightTriggered ? ColorName::COLOR_RED : channelColor[currentChannel];
+                LedMeter(looper.GetReadPos(currentChannel) / looper.GetLoopLength(currentChannel), color);
             }
         }
 
@@ -685,14 +737,7 @@ namespace wreath
         if (hw.tap.RisingEdge() && !buttonPressed)
         {
             buttonPressed = true;
-            if (TriggerMode::REC == currentTriggerMode)
-            {
-                // TODO: Start recording
-            }
-            else
-            {
-                buttonHoldStartTime = System::GetNow();
-            }
+            buttonHoldStartTime = System::GetNow();
         }
 
         // Handle button release.
@@ -717,10 +762,6 @@ namespace wreath
                     looper.mustResetLooper = true;
                     recordingArmed = false;
                 }
-                else if (TriggerMode::REC == currentTriggerMode)
-                {
-                    // TODO: Stop recording
-                }
                 else if (System::GetNow() - buttonHoldStartTime <= kMaxMsHoldForTrigger)
                 {
                     if (Channel::SETTINGS == currentChannel)
@@ -734,6 +775,10 @@ namespace wreath
                         {
                             looper.mustRestart = true;
                         }
+                        else if (TriggerMode::REC == currentTriggerMode)
+                        {
+                            HandleTriggerRecording();
+                        }
                         else
                         {
                             looper.mustRetrigger = true;
@@ -744,7 +789,7 @@ namespace wreath
         }
 
         // Do something while the button is pressed.
-        if (buttonPressed)
+        if (buttonPressed && !recordingLeftTriggered && !recordingRightTriggered)
         {
             if (recordingArmed)
             {
@@ -785,7 +830,7 @@ namespace wreath
                 }
                 else if (TriggerMode::REC == currentTriggerMode)
                 {
-                    // TODO: Start/stop recording
+                    HandleTriggerRecording();
                 }
                 else
                 {
