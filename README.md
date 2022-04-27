@@ -1,4 +1,4 @@
-# Repetita Versio
+# Repetita Versio v1.0.0
 
 A versatile looper for the Versio platform.
 
