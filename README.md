@@ -23,23 +23,23 @@ noise and raw percussions, even when nothing is connected to the inputs.
 
 The features:
 
-- 80 seconds buffer @ 48KHz
+- 80 seconds stereo buffer @ 48KHz
 - independent control for the left and right channels of loop start, loop
-length, speed and freeze amount
+length, speed, freeze amount and recording
 - three trigger modes (triggered recording, free-running, one-shot) with input
 - looper and delay mode
 - variable decay with multi-mode filter and degradation in the feedback path
-- loop start control with automatic loop wrapping
-- loop length and playback direction in a single, continuous, control
-- continuous read speed control, from 0.2x to 1x to 4x, with controllable slew
-up to 10 seconds
+- loop start control with loop wrapping to maintain a fixed length
+- loop length and playback direction in a single control
+- reading speed control, from 0.02x to 4x, with controllable slew up to 10
+seconds
 - "note" mode with 4 octaves tracking
 - instantaneous buffer freezing
-- control of mix between frozen and unfrozen signals
+- crossfading of frozen and unfrozen signals
 - stereo width control
-- filter amount control
+- feedback filter amount control
 - input gain control
-- automatic saving and recalling of the global options
+- settings are persisted between power cycles
 
 ## Controls
 
@@ -90,11 +90,10 @@ mixed with the wet frozen signal.
 - ccw > instant decay;
 - cw > no decay.
 
-**Rate:** The rate of playback of the buffer, from 0.2x to 4x. In note mode,
-controls the transposition (from -2 octaves to +2 octave). It can be channel-
-dependant.
+**Rate:** The playback speed, from 0.02x to 4x. In note mode, controls the
+pitch in semitones (from -2 octaves to +2 octave). It can be channel-dependant.
 
-- ccw > slowest rate (0.2x);
+- ccw > slowest rate (0.02x);
 - noon > normal rate (1x);
 - cw > fastest rate (4x).
 
