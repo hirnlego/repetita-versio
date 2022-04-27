@@ -26,7 +26,7 @@ The features:
 - 80 seconds buffer @ 48KHz
 - independent control for the left and right channels of loop start, loop
 length, speed and freeze amount
-- three button modes (loop, one-shot and triggered recording) with input
+- three trigger modes (triggered recording, free-running, one-shot) with input
 - looper and delay mode
 - variable decay with multi-mode filter and degradation in the feedback path
 - loop start control with automatic loop wrapping
@@ -67,7 +67,7 @@ can be channel-dependant.
 - cw > end of the buffer.
 
 **Tone:** Applies a resonant filter to the feedback path. The default type is
-band-pass, but it can be changed to low-pass or high-pass in *global mode* (see
+band-pass, but it can be changed to low-pass or high-pass in *settings page* (see
 below). When the looper is frozen some of this filtered signal is mixed with
 the wet signal that goes directly to the output. The resonance amount depends on
 the decay amount (the higher the decay the lower the resonance):
@@ -109,39 +109,40 @@ signal, turn the knob fully ccw at 0%.
 - ccw > completely un-frozen (recording);
 - cw > completely frozen (no recording).
 
-**Channel:** The top switch set the channel currently controlled:
+**Channel selector:** The top switch set the channel currently controlled:
 
 - left > left channel;
 - center > both channels are controlled at the same time;
 - right > right channel.
 
-**Button mode:** The bottom switch sets different behaviors for the looper and
+**Trigger mode:** The bottom switch sets different behaviors for the looper and
 how the button and the relative input work:
 
 - left > the looper is continuously reproducing but the recording is stopped.
 One press of the button - or a positive voltage at the input - starts the
-recording, a second press stops it;
-- center > the looper is continuously recording but the reproduction is stopped
+recording, a second one stops it. The two channels can also be recorded
+separately using the channel selector;
+- center > the looper is continuously recording and playing back its content.
+A press of the button, or a positive voltage at the input, restarts the
+reproduction at the position defined by the **Start** knob.
+- right > the looper is continuously recording but the reproduction is stopped
 and can be triggered for a one-shot loop by pressing the button or with a
 positive voltage at the input. The reproduction always begins at the start
 position defined by the **Start** knob;
-- right > the looper is continuously recording and playing back its content.
-A press of the button, or a positive voltage at the input, restarts the
-reproduction at the position defined by the **Start** knob.
 
 ## Startup state
 
 The advised startup state of the UI would be:
 
-**Blend:** 50%
-**Start:** 0%
-**Filter:** 0%
-**Size:** 100%
-**Decay:** 0%
-**Rate:** 50%
-**Freeze:** 0%
-**Channel:** center
-**Button mode:** right
+- **Blend:** 50%
+- **Start:** 0%
+- **Filter:** 0%
+- **Size:** 100%
+- **Decay:** 0%
+- **Rate:** 50%
+- **Freeze:** 0%
+- **Channel selector:** center
+- **Trigger mode:** center
 
 ## Buffering
 
@@ -162,11 +163,11 @@ be useful to re-synchronize the two channels when they've diverged). In one-shot
 mode (center position), it stops at the end of the loop. The same thing happens
 when a positive voltage is received at the relative input.
 
-## Global mode
+## Settings page
 
 Global options can be accessed when the bottom switch is either in the center or
 in the right position by keeping the button pressed for more than 0.3 seconds.
-When in *global mode* the leds lit-up with either a light yellow, creamy color
+When in *settings page* the leds lit-up with either a light yellow, creamy color
 when in looper mode or a light blue, icy color when in delay mode. Caveat:
 because the Versio's CV inputs are tied to the respective knobs and it's
 impossible to establish if a parameter is being changed using either the knob or
@@ -237,24 +238,24 @@ In delay mode:
 - *flanger zone* (backwards) > lavender;
 - ccw > purple.
 
-In both modes the leds are lit white when the **Size** knob is at noon.
+In both modes the leds are lit white(ish) when the **Size** knob is at noon.
 
 ## Operation
 
 ### Looper mode (default)
 
 In this mode the writing head uses all the available working buffer and its loop
-size never changes, resulting in that every change made to the reading head is
-written to the buffer.
-In this mode, then, the **Size** knob only acts on the reading head loop, and
-changing it results in a stuttering effect, where the same fragment is
+size never changes, resulting in every change made to the reading head to be
+written in the buffer.
+In this mode, then, the **Size** knob only acts on the reading head loop size,
+and changing it results in a stuttering effect, where the same fragment is
 continuously repeated and written in the buffer until the writing head finally
-loops and a new fragment is written.
+loops and a new fragment is reproduced.
 
 ### Delay mode
 
 In this mode, activated by turning the **Size** knob clock-wise past noon while
-in the *global mode*, the reading and writing loop sizes are kept synchronized
+in the *settings page*, the reading and writing loop sizes are kept synchronized
 and the module acts as a delay, where the time is given by the loop size.
 
 ### Channels control
@@ -276,7 +277,7 @@ produce destructive modifications to both buffers, but dialing the same
 parameters for the two channels and re-triggering the looper might just do it.
 
 2) more important and less obvious: for the same reason saw above when talking
-about the *global mode*, the modulation will always acts only on the currently
+about the *settings page*, the modulation will always acts only on the currently
 selected channel, or on both at the same time if the switch is in the center
 position. This can be used creatively (for example as a randomization of sorts),
 but be advised that things can go out of control pretty fast :)
@@ -284,7 +285,7 @@ but be advised that things can go out of control pretty fast :)
 Note: when the left and right channels go out of phase, the separation can be
 very noticeable in the stereo field, even produce phase cancellation. To
 minimize the effect reduce the stereo width by turning the **Start** knob ccw
-while in *global mode*. This can also be useful for bringing closer two totally
+while in *settings page*. This can also be useful for bringing closer two totally
 uncorrelated sound sources in the left and right channels.
 
 ### Resetting the buffer
@@ -304,22 +305,22 @@ Pressing and holding the button while armed will cancel the operation.
 ### As an oscillator (of sorts)
 
 When the **Size** knob enters the *flanger zone* the **Rate** knob acts as a
-pitch control and the looper can act as a wavetable oscillator of sorts. If the
-**Size** knob is at noon the loop size is at its shortest (a little less than
-1 ms) and the looper should produce a C4 note:
+pitch control and the looper can function as a wavetable oscillator of sorts.
+If the **Size** knob is at noon the loop size is at its shortest (a little less
+than 1 ms) and the looper should produce a C4 note:
 
 - **Rate:** fully ccw is 2 octaves below and fully cw is 2 octaves above. The
-    relative CV input should track decently;
+relative CV input should track decently;
 - **Freeze:** when fully frozen, the played sound fragment is fixed and thus the
-    produced sound is clear and defined. Let some of the unfrozen sound pass
-    through to get a more organic tone;
+produced sound is clear and defined. Let some of the unfrozen sound pass through
+to get a more organic tone;
 - **Start:** the timbre of the produced sound can be altered by changing the
-    loop's starting point. If the sound's volume happens to be too low, try
-    moving this knob to find a louder fragment.
+loop's starting point. If the sound's volume happens to be too low, try moving
+this knob to find a louder wave.
 
 ### Self oscillation
 
 Jump-start the oscillation by placing the module in delay mode, **Decay** fully
 cw and **Size** at noon. From here, there's a lot of fun to be had by playing
 with the **Size**, **Filter** and **Rate** knobs. Don't forget to crank up the
-filter level (**Decay** knob in *global mode*) for a stronger filter effect!
+filter level (**Decay** knob in *settings page*) for a stronger effect!
