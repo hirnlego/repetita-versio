@@ -348,7 +348,7 @@ namespace wreath
             if (Channel::SETTINGS == channel)
             {
                 localSettings.loopSync = value;
-                looper.SetLoopSync(value >= 0.5);
+                looper.SetLoopSync(Channel::BOTH, value >= 0.5);
                 mustUpdateStorage = true;
             }
             else
@@ -695,7 +695,7 @@ namespace wreath
                 // Show the loop position of the longest channel.
                 ColorName color = recordingLeftTriggered || recordingRightTriggered ? ColorName::COLOR_RED : channelColor[max];
                 // Delay mode.
-                if (looper.HasLoopSync())
+                if (looper.GetLoopSync())
                 {
                     LedMeter(looper.GetReadPos(max) / looper.GetLoopLength(max), color);
                 }
