@@ -2,7 +2,8 @@
 
 ### v1.0.3 (current)
 
-- Docs and comments (from Wreath)
+- Updated Wreath to v1.0.3
+- Fixed the "dragging" effect that occurred when changing loop length while going backwards (from Wreath)
 
 ### v1.0.2
 
