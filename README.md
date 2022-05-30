@@ -49,7 +49,7 @@ TL;DR: the firmware and the source code are provided as-is without any kind of w
 
 ## Firmware installation
 
-Download the latest binary and flash your Versio with the online Programmer:
+Download the [latest binary](https://github.com/hirnlego/repetita-versio/releases) and flash your Versio with the online Programmer:
 https://electro-smith.github.io/Programmer/
 
 ## Modifying the source code
