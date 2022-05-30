@@ -41,7 +41,34 @@ seconds
 - input gain control
 - settings are persisted between power cycles
 
+## License
+
+This software is released under the MIT license, please see the LICENSE file included in the repo.
+
+TL;DR: the firmware and the source code are provided as-is without any kind of warranty or support.
+
+## Firmware installation
+
+Download the latest binary and flash your Versio with the online Programmer:
+https://electro-smith.github.io/Programmer/
+
+## Modifying the source code
+
+Clone the repository with:
+
+```git clone --recurse-submodules https://github.com/hirnlego/repetita-versio```
+
+Inside the root directory you should find a subdir called ```wreath``` that is the module-agnostic looper engine. Inside it there are two Electrosmith packages, ```libDaisy``` and ```DaisySP``` that needs compiling by launching ```make``` from inside the respective directory.
+
+Once done, everything should be ready.
+
+I've used Microsoft Visual Studio Code as IDE and the project configuration is included in the repository. Also, a makefile is present.
+
+To set up your development environment, learn how to debug with a probe and for general help with Daisy and the Electrosmith packages, please refer to their [wiki](https://github.com/electro-smith/DaisyWiki).
+
 ## Controls
+
+The panel's labels depend on which Versio module you have, but using the [Antri Versio](https://noiseengineering.us/blogs/loquelic-literitas-the-blog/create-your-own-firmware-on-a-versio-module) nomenclature these are the controls:
 
 - Knob 1 > [blend]
 - Knob 2 > [start]
