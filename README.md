@@ -218,7 +218,7 @@ In this mode the knobs acts as follow:
 - noon > band pass (default);
 - cw > high pass.
 
-**Start:** Looper/delay mode:
+**Size:** Looper/delay mode:
 
 - ccw > looper mode (default);
 - cw > delay mode.
